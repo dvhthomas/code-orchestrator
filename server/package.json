@@ -1,0 +1,25 @@
+{
+  "name": "@remote-orchestrator/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon --watch src --ext ts --exec tsx src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@remote-orchestrator/shared": "*",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "node-pty": "^1.1.0",
+    "socket.io": "^4.8.3",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/uuid": "^10.0.0",
+    "nodemon": "^3.1.0",
+    "tsx": "^4.19.0"
+  }
+}

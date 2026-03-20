@@ -1,0 +1,70 @@
+import { useState, useEffect, useCallback } from 'react';
+import type { SessionInfo, SessionStatus } from '@remote-orchestrator/shared';
+import type { Socket } from 'socket.io-client';
+import type { ClientToServerEvents, ServerToClientEvents } from '@remote-orchestrator/shared';
+import { api } from '../services/api.js';
+
+type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+
+export function useSessions(socket: TypedSocket) {
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+
+  // Load sessions on mount
+  useEffect(() => {
+    api.getSessions().then(setSessions).catch(console.error);
+  }, []);
+
+  // Listen for socket events
+  useEffect(() => {
+    const handleStatus = ({ sessionId, status }: { sessionId: string; status: SessionStatus }) => {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, status } : s)),
+      );
+    };
+
+    const handleExit = ({ sessionId }: { sessionId: string; exitCode: number }) => {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, status: 'exited' as const } : s)),
+      );
+    };
+
+    const handleCreated = (session: SessionInfo) => {
+      setSessions((prev) => {
+        if (prev.some((s) => s.id === session.id)) return prev;
+        return [...prev, session];
+      });
+    };
+
+    const handleDeleted = ({ sessionId }: { sessionId: string }) => {
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    };
+
+    socket.on('session:status', handleStatus);
+    socket.on('session:exit', handleExit);
+    socket.on('session:created', handleCreated);
+    socket.on('session:deleted', handleDeleted);
+
+    return () => {
+      socket.off('session:status', handleStatus);
+      socket.off('session:exit', handleExit);
+      socket.off('session:created', handleCreated);
+      socket.off('session:deleted', handleDeleted);
+    };
+  }, [socket]);
+
+  const createSession = useCallback(async (folderPath: string, name?: string) => {
+    const session = await api.createSession({ folderPath, name });
+    setSessions((prev) => {
+      if (prev.some((s) => s.id === session.id)) return prev;
+      return [...prev, session];
+    });
+    return session;
+  }, []);
+
+  const deleteSession = useCallback(async (id: string) => {
+    await api.deleteSession(id);
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
+  return { sessions, createSession, deleteSession };
+}

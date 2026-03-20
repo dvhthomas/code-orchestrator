@@ -1,0 +1,165 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useSocket } from './hooks/useSocket.js';
+import { useSessions } from './hooks/useSessions.js';
+import { useSessionOrder } from './hooks/useSessionOrder.js';
+import { Dashboard } from './components/Dashboard.js';
+import { CreateSessionModal } from './components/CreateSessionModal.js';
+
+type Theme = 'dark' | 'light';
+
+function getInitialTheme(): Theme {
+  const stored = localStorage.getItem('theme');
+  if (stored === 'dark' || stored === 'light') return stored;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+export default function App() {
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null);
+  const socket = useSocket();
+  const { sessions, createSession, deleteSession } = useSessions(socket);
+  const { getOrderedSessions, reorder } = useSessionOrder();
+
+  const isDark = theme === 'dark';
+
+  useEffect(() => {
+    document.body.style.background = isDark ? '#1a1b26' : '#f5f5f5';
+    document.body.style.color = isDark ? '#c0caf5' : '#343b58';
+    document.body.style.margin = '0';
+    document.body.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  }, [isDark]);
+
+  // Escape key exits focus mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && focusedSessionId) {
+        setFocusedSessionId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [focusedSessionId]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      return next;
+    });
+  }, []);
+
+  const handleCreate = async (folderPath: string, name?: string) => {
+    await createSession(folderPath, name);
+  };
+
+  const handleClone = useCallback(
+    async (folderPath: string) => {
+      await createSession(folderPath);
+    },
+    [createSession],
+  );
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Close this session? The Claude process will be terminated.')) {
+      if (focusedSessionId === id) {
+        setFocusedSessionId(null);
+      }
+      await deleteSession(id);
+    }
+  };
+
+  const handleFocus = useCallback((id: string) => {
+    setFocusedSessionId(id);
+  }, []);
+
+  const handleUnfocus = useCallback(() => {
+    setFocusedSessionId(null);
+  }, []);
+
+  const orderedSessions = getOrderedSessions(sessions);
+
+  return (
+    <>
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          height: '52px',
+          padding: '0 16px',
+          background: isDark ? '#16161e' : '#e8e8e8',
+          borderBottom: `1px solid ${isDark ? '#2f3549' : '#d0d0d0'}`,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '16px', fontWeight: 700 }}>Remote Orchestrator</span>
+          <span
+            style={{
+              fontSize: '12px',
+              color: isDark ? '#565f89' : '#8b8fa3',
+              background: isDark ? '#1a1b26' : '#f0f0f0',
+              padding: '2px 8px',
+              borderRadius: '10px',
+            }}
+          >
+            {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: 'none',
+              border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
+              borderRadius: '6px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: isDark ? '#a9b1d6' : '#565c73',
+            }}
+            title="Toggle theme"
+          >
+            {isDark ? '\u2600' : '\u263E'}
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            style={{
+              padding: '6px 14px',
+              fontSize: '14px',
+              border: 'none',
+              borderRadius: '6px',
+              background: '#7aa2f7',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontWeight: 500,
+            }}
+          >
+            + New Session
+          </button>
+        </div>
+      </header>
+
+      <Dashboard
+        sessions={orderedSessions}
+        socket={socket}
+        theme={theme}
+        onDeleteSession={handleDelete}
+        onCreateSession={() => setShowCreateModal(true)}
+        onCloneSession={handleClone}
+        onReorder={reorder}
+        focusedSessionId={focusedSessionId}
+        onFocusSession={handleFocus}
+        onUnfocusSession={handleUnfocus}
+      />
+
+      {showCreateModal && (
+        <CreateSessionModal
+          onClose={() => setShowCreateModal(false)}
+          onCreate={handleCreate}
+          theme={theme}
+        />
+      )}
+    </>
+  );
+}
