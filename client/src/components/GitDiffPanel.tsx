@@ -210,6 +210,21 @@ export function GitDiffPanel({
           </div>
         )}
 
+        {!error && totalFiles > 20 && (
+          <div
+            style={{
+              padding: '6px 12px',
+              marginBottom: '8px',
+              borderRadius: '6px',
+              background: isDark ? '#2f2a1a' : '#fff8e6',
+              color: isDark ? '#f59e0b' : '#92600a',
+              fontSize: '12px',
+            }}
+          >
+            {totalFiles} files changed — files are collapsed by default
+          </div>
+        )}
+
         {!error && unstagedFiles.length > 0 && (
           <div>
             {stagedFiles.length > 0 && (

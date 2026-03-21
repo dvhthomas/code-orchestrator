@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type parseDiff from 'parse-diff';
 import { DiffHunk } from './DiffHunk.js';
+
+const MAX_LINES_BEFORE_TRUNCATE = 500;
 
 interface DiffFileSectionProps {
   file: parseDiff.File;
@@ -10,10 +12,17 @@ interface DiffFileSectionProps {
 
 export function DiffFileSection({ file, theme, defaultExpanded }: DiffFileSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [showFull, setShowFull] = useState(false);
   const isDark = theme === 'dark';
 
   const fileName = file.to === '/dev/null' ? file.from : file.to;
   const isBinary = file.chunks.length === 0 && (file.additions === 0 && file.deletions === 0);
+
+  const totalLines = useMemo(
+    () => file.chunks.reduce((sum, c) => sum + c.changes.length, 0),
+    [file.chunks],
+  );
+  const isTruncated = !showFull && totalLines > MAX_LINES_BEFORE_TRUNCATE;
   const isNew = file.new;
   const isDeleted = file.deleted;
 
@@ -90,9 +99,45 @@ export function DiffFileSection({ file, theme, defaultExpanded }: DiffFileSectio
               Binary file changed
             </div>
           ) : (
-            file.chunks.map((chunk, i) => (
-              <DiffHunk key={i} chunk={chunk} theme={theme} />
-            ))
+            <>
+              {file.chunks.map((chunk, i) => {
+                if (isTruncated) {
+                  // Count lines up to this chunk
+                  let linesBefore = 0;
+                  for (let j = 0; j < i; j++) {
+                    linesBefore += file.chunks[j].changes.length;
+                  }
+                  if (linesBefore >= MAX_LINES_BEFORE_TRUNCATE) return null;
+                }
+                return <DiffHunk key={i} chunk={chunk} theme={theme} />;
+              })}
+              {isTruncated && (
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFull(true);
+                    }}
+                    style={{
+                      padding: '4px 12px',
+                      fontSize: '11px',
+                      border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
+                      borderRadius: '4px',
+                      background: 'transparent',
+                      color: isDark ? '#7aa2f7' : '#3b82f6',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Show full diff ({totalLines} lines)
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
