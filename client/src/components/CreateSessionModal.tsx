@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import type { AgentDefinition } from '@remote-orchestrator/shared';
+import { X } from 'lucide-react';
 import { FolderTree } from './FolderTree.js';
+import { Modal } from './primitives/index.js';
+import { Button } from './primitives/index.js';
 import { api } from '../services/api.js';
 
 interface CreateSessionModalProps {
@@ -19,7 +22,6 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [picking, setPicking] = useState(false);
-  const isDark = theme === 'dark';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,10 +29,8 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
       setError('Folder path is required');
       return;
     }
-
     setCreating(true);
     setError('');
-
     try {
       await onCreate(folderPath.trim(), name.trim() || undefined, agentType);
       onClose();
@@ -45,9 +45,7 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
     setPicking(true);
     try {
       const path = await api.pickFolder();
-      if (path) {
-        setFolderPath(path);
-      }
+      if (path) setFolderPath(path);
     } catch {
       setError('Failed to open folder picker');
     } finally {
@@ -61,57 +59,28 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 100,
-      }}
-      onClick={onClose}
-      onDragOver={preventDrag}
-      onDrop={preventDrag}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: isDark ? '#24283b' : '#ffffff',
-          borderRadius: '12px',
-          padding: '24px',
-          width: '560px',
-          maxWidth: '90vw',
-          maxHeight: '80vh',
-          overflowY: 'auto',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        }}
+    <div onDragOver={preventDrag} onDrop={preventDrag}>
+      <Modal
+        isOpen
+        onClose={onClose}
+        title="New Session"
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button variant="primary" type="submit" loading={creating} onClick={() => {
+              const form = document.getElementById('create-session-form') as HTMLFormElement;
+              form?.requestSubmit();
+            }}>
+              Create
+            </Button>
+          </>
+        }
       >
-        <h2
-          style={{
-            margin: '0 0 20px 0',
-            fontSize: '18px',
-            fontWeight: 600,
-            color: isDark ? '#c0caf5' : '#343b58',
-          }}
-        >
-          New Session
-        </h2>
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '16px' }}>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '6px',
-                fontSize: '13px',
-                fontWeight: 500,
-                color: isDark ? '#a9b1d6' : '#565c73',
-              }}
-            >
-              Project Folder
-            </label>
+        <form id="create-session-form" onSubmit={handleSubmit}>
+          {/* Folder */}
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <label style={labelStyle}>Project Folder</label>
 
             {!folderPath ? (
               <>
@@ -122,20 +91,22 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
                   style={{
                     width: '100%',
                     padding: '8px 14px',
-                    fontSize: '13px',
-                    border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-                    borderRadius: '6px',
-                    background: isDark ? '#1a1b26' : '#ffffff',
-                    color: isDark ? '#7aa2f7' : '#3b5998',
+                    fontSize: 'var(--text-base)',
+                    border: '1px solid var(--color-border-subtle)',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--color-bg-input)',
+                    color: 'var(--color-accent)',
                     cursor: picking ? 'wait' : 'pointer',
-                    marginBottom: '8px',
+                    marginBottom: 'var(--space-2)',
                     textAlign: 'left',
                     fontWeight: 500,
+                    transition: 'background var(--transition-fast)',
                   }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-accent-bg)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-bg-input)'; }}
                 >
                   {picking ? 'Opening...' : 'Choose Folder from System...'}
                 </button>
-
                 <FolderTree onSelect={setFolderPath} theme={theme} />
               </>
             ) : (
@@ -143,13 +114,13 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 'var(--space-2)',
                   padding: '6px 10px',
-                  fontSize: '12px',
-                  fontFamily: 'Menlo, Monaco, monospace',
-                  color: isDark ? '#7aa2f7' : '#3b5998',
-                  background: isDark ? '#1a1b26' : '#f0f4ff',
-                  borderRadius: '4px',
+                  fontSize: 'var(--text-sm)',
+                  fontFamily: 'var(--font-mono)',
+                  color: 'var(--color-accent)',
+                  background: 'var(--color-accent-bg)',
+                  borderRadius: 'var(--radius-sm)',
                 }}
               >
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -159,51 +130,34 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
                   type="button"
                   onClick={() => setFolderPath('')}
                   style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
                     background: 'none',
                     border: 'none',
-                    color: isDark ? '#565f89' : '#8b8fa3',
+                    color: 'var(--color-text-muted)',
                     cursor: 'pointer',
-                    fontSize: '14px',
                     padding: '0 2px',
-                    lineHeight: 1,
                     flexShrink: 0,
+                    transition: 'color var(--transition-fast)',
                   }}
-                  title="Change folder"
+                  aria-label="Change folder"
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-error)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
                 >
-                  {'\u2715'}
+                  <X size={13} strokeWidth={2} />
                 </button>
               </div>
             )}
           </div>
 
+          {/* Agent */}
           {agents.length > 0 && (
-            <div style={{ marginBottom: '16px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: '6px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  color: isDark ? '#a9b1d6' : '#565c73',
-                }}
-              >
-                Agent
-              </label>
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label style={labelStyle}>Agent</label>
               <select
                 value={agentType}
                 onChange={(e) => setAgentType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  fontSize: '14px',
-                  border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-                  borderRadius: '6px',
-                  background: isDark ? '#1a1b26' : '#ffffff',
-                  color: isDark ? '#c0caf5' : '#343b58',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  cursor: 'pointer',
-                }}
+                style={selectStyle}
               >
                 {agents.map((agent) => (
                   <option key={agent.id} value={agent.id}>
@@ -214,88 +168,63 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
             </div>
           )}
 
-          <div style={{ marginBottom: '20px' }}>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '6px',
-                fontSize: '13px',
-                fontWeight: 500,
-                color: isDark ? '#a9b1d6' : '#565c73',
-              }}
-            >
-              Session Name (optional)
-            </label>
+          {/* Name */}
+          <div style={{ marginBottom: 'var(--space-5)' }}>
+            <label style={labelStyle}>Session Name (optional)</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Defaults to folder name"
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                fontSize: '14px',
-                border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-                borderRadius: '6px',
-                background: isDark ? '#1a1b26' : '#ffffff',
-                color: isDark ? '#c0caf5' : '#343b58',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
+              style={inputStyle}
             />
           </div>
 
-          {error && (
-            <div
-              style={{
-                marginBottom: '16px',
-                padding: '8px 12px',
-                background: isDark ? '#3b2030' : '#fee2e2',
-                color: '#f7768e',
-                borderRadius: '6px',
-                fontSize: '13px',
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '8px 16px',
-                fontSize: '14px',
-                border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-                borderRadius: '6px',
-                background: 'transparent',
-                color: isDark ? '#a9b1d6' : '#565c73',
-                cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={creating}
-              style={{
-                padding: '8px 16px',
-                fontSize: '14px',
-                border: 'none',
-                borderRadius: '6px',
-                background: '#7aa2f7',
-                color: '#ffffff',
-                cursor: creating ? 'not-allowed' : 'pointer',
-                opacity: creating ? 0.6 : 1,
-                fontWeight: 500,
-              }}
-            >
-              {creating ? 'Creating...' : 'Create'}
-            </button>
-          </div>
+          {error && <ErrorBanner message={error} />}
         </form>
-      </div>
+      </Modal>
+    </div>
+  );
+}
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  marginBottom: '6px',
+  fontSize: 'var(--text-base)',
+  fontWeight: 500,
+  color: 'var(--color-text-secondary)',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '8px 12px',
+  fontSize: 'var(--text-md)',
+  border: '1px solid var(--color-border-subtle)',
+  borderRadius: 'var(--radius-md)',
+  background: 'var(--color-bg-input)',
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
+
+const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  cursor: 'pointer',
+};
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        marginBottom: 'var(--space-4)',
+        padding: '8px 12px',
+        background: 'var(--color-error-bg)',
+        color: 'var(--color-error)',
+        borderRadius: 'var(--radius-md)',
+        fontSize: 'var(--text-base)',
+      }}
+    >
+      {message}
     </div>
   );
 }

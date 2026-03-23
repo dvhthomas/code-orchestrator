@@ -5,7 +5,9 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@remote-orchest
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Plus, GripVertical } from 'lucide-react';
 import { TerminalPanel } from './TerminalPanel.js';
+import { Tooltip } from './primitives/index.js';
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -32,7 +34,6 @@ export function SessionGroup({
   onToggleDiff,
   focusedSessionId,
 }: SessionGroupProps) {
-  const isDark = theme === 'dark';
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: `group::${folderPath}`,
   });
@@ -52,10 +53,10 @@ export function SessionGroup({
       ref={setNodeRef}
       style={{
         ...style,
-        borderLeft: `3px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-        borderRadius: '8px',
-        padding: '8px',
-        background: isDark ? '#1e1f2e' : '#efefef',
+        borderLeft: '3px solid var(--color-border-subtle)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-2)',
+        background: 'var(--color-bg-surface)',
         overflow: 'hidden',
         minHeight: 0,
         display: 'flex',
@@ -67,34 +68,33 @@ export function SessionGroup({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '4px 8px',
+          padding: '4px 6px',
           marginBottom: '4px',
           flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+          <Tooltip content="Drag to reorder group" position="bottom">
+            <span
+              {...attributes}
+              {...listeners}
+              style={{
+                cursor: 'grab',
+                color: 'var(--color-text-muted)',
+                flexShrink: 0,
+                userSelect: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}
+            >
+              <GripVertical size={14} strokeWidth={1.75} />
+            </span>
+          </Tooltip>
           <span
-            {...attributes}
-            {...listeners}
             style={{
-              cursor: 'grab',
-              color: isDark ? '#565f89' : '#8b8fa3',
-              flexShrink: 0,
-              userSelect: 'none',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-            title="Drag to reorder group"
-          >
-            <svg width="14" height="14" viewBox="0 0 12 12" fill="currentColor">
-              <polygon points="6,0 8,3 7,3 7,5 9,5 9,4 12,6 9,8 9,7 7,7 7,9 8,9 6,12 4,9 5,9 5,7 3,7 3,8 0,6 3,4 3,5 5,5 5,3 4,3" />
-            </svg>
-          </span>
-          <span
-            style={{
-              fontSize: '12px',
-              fontFamily: 'Menlo, Monaco, monospace',
-              color: isDark ? '#a9b1d6' : '#565c73',
+              fontSize: 'var(--text-sm)',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--color-text-secondary)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -104,38 +104,55 @@ export function SessionGroup({
           </span>
           <span
             style={{
-              fontSize: '11px',
-              color: isDark ? '#565f89' : '#8b8fa3',
-              background: isDark ? '#1a1b26' : '#e0e0e0',
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-muted)',
+              background: 'var(--color-bg-base)',
               padding: '1px 6px',
-              borderRadius: '8px',
+              borderRadius: 'var(--radius-pill)',
               flexShrink: 0,
             }}
           >
             {sessions.length}
           </span>
         </div>
-        <button
-          onClick={() => onCloneSession(folderPath)}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: isDark ? '#565f89' : '#8b8fa3',
-            cursor: 'pointer',
-            fontSize: '16px',
-            padding: '0 4px',
-            lineHeight: 1,
-          }}
-          title="New session in this folder"
-        >
-          +
-        </button>
+
+        <Tooltip content="New session in this folder" position="left">
+          <button
+            onClick={() => onCloneSession(folderPath)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 26,
+              height: 26,
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              background: 'transparent',
+              color: 'var(--color-text-muted)',
+              cursor: 'pointer',
+              padding: 0,
+              transition: 'background var(--transition-fast), color var(--transition-fast)',
+            }}
+            aria-label="New session in this folder"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--color-bg-elevated)';
+              e.currentTarget.style.color = 'var(--color-accent)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = 'var(--color-text-muted)';
+            }}
+          >
+            <Plus size={14} strokeWidth={2} />
+          </button>
+        </Tooltip>
       </div>
+
       <SortableContext items={sessionSortableIds} strategy={rectSortingStrategy}>
         <div
           style={{
             display: 'grid',
-            gap: '8px',
+            gap: 'var(--space-2)',
             gridTemplateColumns: 'repeat(auto-fit, minmax(min(600px, 100%), 1fr))',
             gridAutoRows: '1fr',
             flex: 1,

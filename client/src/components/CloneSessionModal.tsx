@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { AgentDefinition } from '@remote-orchestrator/shared';
+import { Modal } from './primitives/index.js';
+import { Button } from './primitives/index.js';
 
 interface CloneSessionModalProps {
   folderPath: string;
@@ -16,14 +18,12 @@ export function CloneSessionModal({
   currentAgentType,
   agents,
   defaultAgentType = 'claude',
-  theme,
   onClone,
   onClose,
 }: CloneSessionModalProps) {
   const [agentType, setAgentType] = useState(currentAgentType || defaultAgentType);
   const [cloning, setCloning] = useState(false);
   const [error, setError] = useState('');
-  const isDark = theme === 'dark';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,159 +40,98 @@ export function CloneSessionModal({
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 200,
-      }}
-      onClick={onClose}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Clone Session"
+      size="sm"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={cloning} onClick={() => {
+            const form = document.getElementById('clone-session-form') as HTMLFormElement;
+            form?.requestSubmit();
+          }}>
+            Clone
+          </Button>
+        </>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: isDark ? '#24283b' : '#ffffff',
-          borderRadius: '12px',
-          padding: '24px',
-          width: '420px',
-          maxWidth: '90vw',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        }}
-      >
-        <h2
-          style={{
-            margin: '0 0 20px 0',
-            fontSize: '18px',
-            fontWeight: 600,
-            color: isDark ? '#c0caf5' : '#343b58',
-          }}
-        >
-          Clone Session
-        </h2>
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '16px' }}>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '6px',
-                fontSize: '13px',
-                fontWeight: 500,
-                color: isDark ? '#a9b1d6' : '#565c73',
-              }}
-            >
-              Folder
-            </label>
-            <div
-              style={{
-                padding: '6px 10px',
-                fontSize: '12px',
-                fontFamily: 'Menlo, Monaco, monospace',
-                color: isDark ? '#7aa2f7' : '#3b5998',
-                background: isDark ? '#1a1b26' : '#f0f4ff',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {folderPath}
-            </div>
+      <form id="clone-session-form" onSubmit={handleSubmit}>
+        {/* Folder display */}
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <label style={labelStyle}>Folder</label>
+          <div
+            style={{
+              padding: '6px 10px',
+              fontSize: 'var(--text-sm)',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--color-accent)',
+              background: 'var(--color-accent-bg)',
+              borderRadius: 'var(--radius-sm)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {folderPath}
           </div>
+        </div>
 
-          {agents.length > 0 && (
-            <div style={{ marginBottom: '20px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: '6px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  color: isDark ? '#a9b1d6' : '#565c73',
-                }}
-              >
-                Agent
-              </label>
-              <select
-                value={agentType}
-                onChange={(e) => setAgentType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  fontSize: '14px',
-                  border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-                  borderRadius: '6px',
-                  background: isDark ? '#1a1b26' : '#ffffff',
-                  color: isDark ? '#c0caf5' : '#343b58',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  cursor: 'pointer',
-                }}
-              >
-                {agents.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.name}{!agent.builtin ? ' (custom)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {error && (
-            <div
-              style={{
-                marginBottom: '16px',
-                padding: '8px 12px',
-                background: isDark ? '#3b2030' : '#fee2e2',
-                color: '#f7768e',
-                borderRadius: '6px',
-                fontSize: '13px',
-              }}
+        {/* Agent */}
+        {agents.length > 0 && (
+          <div style={{ marginBottom: 'var(--space-5)' }}>
+            <label style={labelStyle}>Agent</label>
+            <select
+              value={agentType}
+              onChange={(e) => setAgentType(e.target.value)}
+              style={selectStyle}
             >
-              {error}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '8px 16px',
-                fontSize: '14px',
-                border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-                borderRadius: '6px',
-                background: 'transparent',
-                color: isDark ? '#a9b1d6' : '#565c73',
-                cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={cloning}
-              style={{
-                padding: '8px 16px',
-                fontSize: '14px',
-                border: 'none',
-                borderRadius: '6px',
-                background: '#7aa2f7',
-                color: '#ffffff',
-                cursor: cloning ? 'not-allowed' : 'pointer',
-                opacity: cloning ? 0.6 : 1,
-                fontWeight: 500,
-              }}
-            >
-              {cloning ? 'Cloning...' : 'Clone'}
-            </button>
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name}{!agent.builtin ? ' (custom)' : ''}
+                </option>
+              ))}
+            </select>
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        {error && (
+          <div
+            style={{
+              marginBottom: 'var(--space-4)',
+              padding: '8px 12px',
+              background: 'var(--color-error-bg)',
+              color: 'var(--color-error)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--text-base)',
+            }}
+          >
+            {error}
+          </div>
+        )}
+      </form>
+    </Modal>
   );
 }
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  marginBottom: '6px',
+  fontSize: 'var(--text-base)',
+  fontWeight: 500,
+  color: 'var(--color-text-secondary)',
+};
+
+const selectStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '8px 12px',
+  fontSize: 'var(--text-md)',
+  border: '1px solid var(--color-border-subtle)',
+  borderRadius: 'var(--radius-md)',
+  background: 'var(--color-bg-input)',
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+  boxSizing: 'border-box',
+  cursor: 'pointer',
+};

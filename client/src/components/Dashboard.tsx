@@ -12,11 +12,13 @@ import {
 } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { Plus, GitBranch, Maximize2 } from 'lucide-react';
 import { TerminalPanel } from './TerminalPanel.js';
 import { SessionGroup } from './SessionGroup.js';
 import { GitDiffPanel } from './GitDiffPanel.js';
 import { CollapsedSessionStrip } from './CollapsedSessionStrip.js';
 import { useGitDiff } from '../hooks/useGitDiff.js';
+import { Tooltip } from './primitives/index.js';
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -111,7 +113,6 @@ export function Dashboard({
   onToggleDiffFullscreen,
   onCloseDiff,
 }: DashboardProps) {
-  const isDark = theme === 'dark';
   const isFocused = !!focusedSessionId;
   const focusedSession = isFocused ? sessions.find((s) => s.id === focusedSessionId) : null;
 
@@ -171,13 +172,11 @@ export function Dashboard({
     triggerRefit();
   };
 
-  // Handle unfocus with refit
   const handleUnfocus = () => {
     onUnfocusSession();
     triggerRefit();
   };
 
-  // Handle switching focus between sessions with refit
   const handleSwitchFocus = (id: string) => {
     onFocusSession(id);
     triggerRefit();
@@ -192,34 +191,67 @@ export function Dashboard({
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          height: 'calc(100vh - 60px)',
-          color: isDark ? '#565f89' : '#8b8fa3',
+          height: 'calc(100vh - var(--header-height))',
+          gap: 'var(--space-4)',
+          color: 'var(--color-text-muted)',
         }}
       >
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>+</div>
-        <div style={{ fontSize: '16px', marginBottom: '8px' }}>No active sessions</div>
+        {/* Terminal illustration */}
+        <div
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 'var(--radius-xl)',
+            background: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border-base)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--color-text-muted)',
+          }}
+        >
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path d="M6 8l3 3-3 3M11 14h6" />
+          </svg>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+            No sessions yet
+          </div>
+          <div style={{ fontSize: 'var(--text-md)', color: 'var(--color-text-muted)' }}>
+            Create a Claude Code session to get started
+          </div>
+        </div>
         <button
           onClick={onCreateSession}
           style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
             padding: '10px 20px',
-            fontSize: '14px',
+            fontSize: 'var(--text-md)',
             border: 'none',
-            borderRadius: '8px',
-            background: '#7aa2f7',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--color-accent)',
             color: '#ffffff',
             cursor: 'pointer',
             fontWeight: 500,
+            transition: 'opacity var(--transition-fast)',
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
         >
-          Create Session
+          <Plus size={16} strokeWidth={2} />
+          New Session
         </button>
       </div>
     );
   }
 
   return (
-    <div style={{ position: 'relative', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
-      {/* Focus overlay - rendered on top when a session is focused */}
+    <div style={{ position: 'relative', height: 'calc(100vh - var(--header-height))', overflow: 'hidden' }}>
+      {/* Focus overlay */}
       {isFocused && focusedSession && (
         <div
           style={{
@@ -228,29 +260,30 @@ export function Dashboard({
             zIndex: 10,
             display: 'flex',
             flexDirection: 'column',
-            background: isDark ? '#1a1b26' : '#f5f5f5',
+            background: 'var(--color-bg-base)',
           }}
         >
+          {/* Focus header bar */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '6px 16px',
-              background: isDark ? '#1e1f2e' : '#efefef',
-              borderBottom: `1px solid ${isDark ? '#2f3549' : '#d0d0d0'}`,
+              background: 'var(--color-bg-surface)',
+              borderBottom: '1px solid var(--color-border-base)',
               flexShrink: 0,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: isDark ? '#c0caf5' : '#343b58' }}>
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                 {focusedSession.name}
               </span>
               <span
                 style={{
-                  fontSize: '11px',
-                  fontFamily: 'Menlo, Monaco, monospace',
-                  color: isDark ? '#565f89' : '#8b8fa3',
+                  fontSize: 'var(--text-sm)',
+                  fontFamily: 'var(--font-mono)',
+                  color: 'var(--color-text-muted)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -259,53 +292,58 @@ export function Dashboard({
                 {focusedSession.folderPath}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                onClick={() => onCloneSession(focusedSession.folderPath, focusedSession.agentType)}
-                style={{
-                  padding: '4px 12px',
-                  fontSize: '12px',
-                  border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-                  borderRadius: '4px',
-                  background: 'transparent',
-                  color: isDark ? '#a9b1d6' : '#565c73',
-                  cursor: 'pointer',
-                }}
-                title="New session in this folder"
-              >
-                + Session
-              </button>
-              <button
-                onClick={() => onToggleDiff(focusedSession.id)}
-                style={{
-                  padding: '4px 12px',
-                  fontSize: '12px',
-                  border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-                  borderRadius: '4px',
-                  background: getDiffState(focusedSession.id).isOpen ? '#7aa2f7' : 'transparent',
-                  color: getDiffState(focusedSession.id).isOpen ? '#ffffff' : (isDark ? '#a9b1d6' : '#565c73'),
-                  cursor: 'pointer',
-                }}
-                title="Toggle diff view"
-              >
-                Diff
-              </button>
-              <button
-                onClick={handleUnfocus}
-                style={{
-                  padding: '4px 12px',
-                  fontSize: '12px',
-                  border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-                  borderRadius: '4px',
-                  background: 'transparent',
-                  color: isDark ? '#a9b1d6' : '#565c73',
-                  cursor: 'pointer',
-                }}
-              >
-                Exit Focus
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Tooltip content="New session in this folder" position="bottom">
+                <button
+                  onClick={() => onCloneSession(focusedSession.folderPath, focusedSession.agentType)}
+                  style={focusBarBtnStyle}
+                  aria-label="New session in this folder"
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-elevated)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <Plus size={13} strokeWidth={2} />
+                  Session
+                </button>
+              </Tooltip>
+              <Tooltip content="Toggle diff view" position="bottom">
+                <button
+                  onClick={() => onToggleDiff(focusedSession.id)}
+                  style={{
+                    ...focusBarBtnStyle,
+                    background: getDiffState(focusedSession.id).isOpen ? 'var(--color-accent)' : 'transparent',
+                    color: getDiffState(focusedSession.id).isOpen ? '#ffffff' : 'var(--color-text-secondary)',
+                    borderColor: getDiffState(focusedSession.id).isOpen ? 'transparent' : 'var(--color-border-subtle)',
+                  }}
+                  aria-label="Toggle diff view"
+                  onMouseEnter={(e) => {
+                    if (!getDiffState(focusedSession.id).isOpen)
+                      e.currentTarget.style.background = 'var(--color-bg-elevated)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = getDiffState(focusedSession.id).isOpen
+                      ? 'var(--color-accent)'
+                      : 'transparent';
+                  }}
+                >
+                  <GitBranch size={13} strokeWidth={1.75} />
+                  Diff
+                </button>
+              </Tooltip>
+              <Tooltip content="Exit focus mode" position="bottom">
+                <button
+                  onClick={handleUnfocus}
+                  style={focusBarBtnStyle}
+                  aria-label="Exit focus mode"
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-elevated)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <Maximize2 size={13} strokeWidth={1.75} />
+                  Exit Focus
+                </button>
+              </Tooltip>
             </div>
           </div>
+
           {sessions.length > 1 && (
             <CollapsedSessionStrip
               sessions={sessions}
@@ -314,8 +352,8 @@ export function Dashboard({
               onSwitchFocus={handleSwitchFocus}
             />
           )}
-          <div style={{ flex: 1, minHeight: 0, padding: '8px', display: 'flex', flexDirection: 'row' }}>
-            {/* Terminal — hidden when diff is fullscreen */}
+
+          <div style={{ flex: 1, minHeight: 0, padding: 'var(--space-2)', display: 'flex', flexDirection: 'row' }}>
             {!(getDiffState(focusedSession.id).isOpen && getDiffState(focusedSession.id).isFullscreen) && (
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                 <TerminalPanel
@@ -328,7 +366,6 @@ export function Dashboard({
                 />
               </div>
             )}
-            {/* Diff panel */}
             {getDiffState(focusedSession.id).isOpen && (
               <FocusedDiffWrapper
                 sessionId={focusedSession.id}
@@ -343,18 +380,17 @@ export function Dashboard({
         </div>
       )}
 
-      {/* Grouped view - ALWAYS rendered, hidden behind focus overlay when focused */}
+      {/* Grouped grid view */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={groupSortableIds} strategy={verticalListSortingStrategy}>
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: `repeat(auto-fit, minmax(min(500px, 100%), 1fr))`,
-              gap: '8px',
-              padding: '8px',
+              gap: 'var(--space-2)',
+              padding: 'var(--space-2)',
               height: '100%',
               overflow: 'hidden',
-              // When focused, keep in DOM but make non-interactive
               visibility: isFocused ? 'hidden' : 'visible',
               pointerEvents: isFocused ? 'none' : 'auto',
             }}
@@ -379,3 +415,18 @@ export function Dashboard({
     </div>
   );
 }
+
+const focusBarBtnStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '4px',
+  padding: '4px 10px',
+  fontSize: 'var(--text-sm)',
+  border: '1px solid var(--color-border-subtle)',
+  borderRadius: 'var(--radius-sm)',
+  background: 'transparent',
+  color: 'var(--color-text-secondary)',
+  cursor: 'pointer',
+  transition: 'background var(--transition-fast)',
+  fontWeight: 500,
+};

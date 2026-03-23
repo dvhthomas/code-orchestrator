@@ -1,4 +1,6 @@
 import type { NgrokStatus } from '@remote-orchestrator/shared';
+import { Modal } from './primitives/index.js';
+import { Button } from './primitives/index.js';
 
 interface NgrokModalProps {
   onClose: () => void;
@@ -13,7 +15,6 @@ interface NgrokModalProps {
 
 export function NgrokModal({
   onClose,
-  theme,
   status,
   loading,
   error,
@@ -21,17 +22,8 @@ export function NgrokModal({
   onStop,
   onRecheck,
 }: NgrokModalProps) {
-  const isDark = theme === 'dark';
-
-  const bg = isDark ? '#1e1f2e' : '#ffffff';
-  const border = isDark ? '#3b4261' : '#d0d0d0';
-  const textMuted = isDark ? '#565f89' : '#8b8fa3';
-  const textPrimary = isDark ? '#c0caf5' : '#343b58';
-  const codeBg = isDark ? '#16161e' : '#f0f0f0';
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => {
-      // fallback for older browsers
       const el = document.createElement('textarea');
       el.value = text;
       document.body.appendChild(el);
@@ -66,335 +58,213 @@ export function NgrokModal({
   const isConnecting = status?.tunnelStatus === 'connecting' || loading;
   const isError = status?.tunnelStatus === 'error';
 
+  const footer = status?.installed ? (
+    <>
+      <Button variant="secondary" onClick={onClose}>Close</Button>
+      {isConnected ? (
+        <Button variant="danger" loading={loading} onClick={onStop}>
+          Stop Tunnel
+        </Button>
+      ) : (
+        <Button variant="primary" disabled={isConnecting} onClick={onStart}>
+          {isConnecting ? 'Connecting…' : isError ? 'Retry' : 'Start Tunnel'}
+        </Button>
+      )}
+    </>
+  ) : (
+    <>
+      <Button variant="secondary" onClick={onClose}>Close</Button>
+      <Button variant="primary" onClick={onRecheck}>Re-check Installation</Button>
+    </>
+  );
+
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        zIndex: 100,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: bg,
-          borderRadius: '12px',
-          padding: '24px',
-          width: '520px',
-          maxWidth: '90vw',
-          maxHeight: '80vh',
-          overflowY: 'auto',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          border: `1px solid ${border}`,
-        }}
-      >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: textPrimary }}>
-            Remote Access
-          </h2>
-          <StatusBadge status={status} isDark={isDark} />
+    <Modal isOpen onClose={onClose} title="Remote Access" size="md" footer={footer}>
+      {/* Status badge */}
+      {status && (
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <StatusBadge status={status} />
         </div>
+      )}
 
-        {/* Error from hook */}
-        {error && (
-          <div style={{
-            background: isDark ? 'rgba(247,118,142,0.1)' : 'rgba(200,0,0,0.08)',
-            border: `1px solid ${isDark ? '#f7768e' : '#cc0000'}`,
-            borderRadius: '6px',
-            padding: '10px 12px',
-            marginBottom: '16px',
-            fontSize: '13px',
-            color: isDark ? '#f7768e' : '#cc0000',
-          }}>
-            {error}
+      {/* Hook error */}
+      {error && <ErrorBox message={error} />}
+
+      {/* Process error */}
+      {isError && status?.error && !error && <ErrorBox message={status.error} />}
+
+      {/* Not installed */}
+      {status && !status.installed && (
+        <NotInstalledView instructions={installInstructions(status.platform)} />
+      )}
+
+      {/* Installed — connected */}
+      {status?.installed && isConnected && status.publicUrl && (
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <p style={{ margin: '0 0 8px', fontSize: 'var(--text-base)', color: 'var(--color-text-muted)' }}>
+            Public URL
+          </p>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              background: 'var(--color-bg-code)',
+              borderRadius: 'var(--radius-md)',
+              padding: '10px 12px',
+              border: '1px solid var(--color-border-base)',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: 'monospace',
+                fontSize: 'var(--text-md)',
+                color: 'var(--color-success)',
+                flex: 1,
+                wordBreak: 'break-all',
+              }}
+            >
+              {status.publicUrl}
+            </span>
+            <button
+              onClick={() => copyToClipboard(status.publicUrl!)}
+              style={actionLinkStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-elevated)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              Copy
+            </button>
+            <a
+              href={status.publicUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{ ...actionLinkStyle, textDecoration: 'none', display: 'inline-block' }}
+            >
+              Open ↗
+            </a>
           </div>
-        )}
 
-        {/* ngrok process error */}
-        {isError && status?.error && !error && (
-          <div style={{
-            background: isDark ? 'rgba(247,118,142,0.1)' : 'rgba(200,0,0,0.08)',
-            border: `1px solid ${isDark ? '#f7768e' : '#cc0000'}`,
-            borderRadius: '6px',
-            padding: '10px 12px',
-            marginBottom: '16px',
-            fontSize: '13px',
-            color: isDark ? '#f7768e' : '#cc0000',
-          }}>
-            {status.error}
+          <div
+            style={{
+              marginTop: 'var(--space-3)',
+              padding: '10px 12px',
+              background: 'var(--color-warning-bg)',
+              border: '1px solid var(--color-warning-border)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-warning)',
+            }}
+          >
+            ⚠ Anyone with this URL can control your Claude sessions.
           </div>
-        )}
 
-        {/* Not installed state */}
-        {status && !status.installed && (
-          <NotInstalledView
-            instructions={installInstructions(status.platform)}
-            onRecheck={onRecheck}
-            onClose={onClose}
-            isDark={isDark}
-            codeBg={codeBg}
-            textMuted={textMuted}
-            textPrimary={textPrimary}
-            border={border}
-          />
-        )}
+          <p style={{ margin: '12px 0 0', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+            Sleep prevention is active — your computer will stay awake while the tunnel is open.
+          </p>
+        </div>
+      )}
 
-        {/* Installed state */}
-        {status?.installed && (
-          <>
-            {/* Connected: show URL */}
-            {isConnected && status.publicUrl && (
-              <div style={{ marginBottom: '20px' }}>
-                <p style={{ margin: '0 0 8px', fontSize: '13px', color: textMuted }}>
-                  Public URL
-                </p>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: codeBg,
-                  borderRadius: '6px',
-                  padding: '10px 12px',
-                  border: `1px solid ${border}`,
-                }}>
-                  <span style={{
-                    fontFamily: 'monospace',
-                    fontSize: '14px',
-                    color: '#9ece6a',
-                    flex: 1,
-                    wordBreak: 'break-all',
-                  }}>
-                    {status.publicUrl}
-                  </span>
-                  <button
-                    onClick={() => copyToClipboard(status.publicUrl!)}
-                    style={{
-                      background: 'none',
-                      border: `1px solid ${border}`,
-                      borderRadius: '4px',
-                      padding: '4px 8px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      color: textMuted,
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0,
-                    }}
-                  >
-                    Copy
-                  </button>
-                  <a
-                    href={status.publicUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      border: `1px solid ${border}`,
-                      borderRadius: '4px',
-                      padding: '4px 8px',
-                      fontSize: '12px',
-                      color: textMuted,
-                      textDecoration: 'none',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0,
-                    }}
-                  >
-                    Open ↗
-                  </a>
-                </div>
-
-                <div style={{
-                  marginTop: '12px',
-                  padding: '10px 12px',
-                  background: isDark ? 'rgba(224,175,104,0.08)' : 'rgba(180,120,0,0.07)',
-                  border: `1px solid ${isDark ? '#e0af68' : '#c08000'}`,
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  color: isDark ? '#e0af68' : '#a06800',
-                }}>
-                  ⚠ Anyone with this URL can control your Claude sessions.
-                </div>
-
-                <p style={{ margin: '12px 0 0', fontSize: '12px', color: textMuted }}>
-                  Sleep prevention is active — your computer will stay awake while the tunnel is open.
-                </p>
-              </div>
-            )}
-
-            {/* Disconnected / ready */}
-            {!isConnected && !isConnecting && (
-              <div style={{ marginBottom: '20px' }}>
-                <p style={{ margin: '0 0 4px', fontSize: '14px', color: textPrimary }}>
-                  Start an ngrok tunnel to access this dashboard remotely.
-                </p>
-                <p style={{ margin: '0', fontSize: '13px', color: textMuted }}>
-                  Your computer will stay awake while the tunnel is active.
-                </p>
-              </div>
-            )}
-
-            {/* Action buttons */}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={onClose}
-                style={{
-                  padding: '8px 16px',
-                  fontSize: '14px',
-                  background: 'none',
-                  border: `1px solid ${border}`,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  color: textMuted,
-                }}
-              >
-                Close
-              </button>
-
-              {isConnected ? (
-                <button
-                  onClick={onStop}
-                  disabled={loading}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '14px',
-                    border: 'none',
-                    borderRadius: '6px',
-                    background: loading ? (isDark ? '#3b4261' : '#d0d0d0') : '#f7768e',
-                    color: loading ? textMuted : '#ffffff',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    fontWeight: 500,
-                  }}
-                >
-                  {loading ? 'Stopping…' : 'Stop Tunnel'}
-                </button>
-              ) : (
-                <button
-                  onClick={onStart}
-                  disabled={isConnecting}
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '14px',
-                    border: 'none',
-                    borderRadius: '6px',
-                    background: isConnecting ? (isDark ? '#3b4261' : '#d0d0d0') : '#7aa2f7',
-                    color: isConnecting ? textMuted : '#ffffff',
-                    cursor: isConnecting ? 'not-allowed' : 'pointer',
-                    fontWeight: 500,
-                  }}
-                >
-                  {isConnecting ? 'Connecting…' : isError ? 'Retry' : 'Start Tunnel'}
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+      {/* Installed — disconnected */}
+      {status?.installed && !isConnected && !isConnecting && (
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <p style={{ margin: '0 0 4px', fontSize: 'var(--text-md)', color: 'var(--color-text-primary)' }}>
+            Start an ngrok tunnel to access this dashboard remotely.
+          </p>
+          <p style={{ margin: 0, fontSize: 'var(--text-base)', color: 'var(--color-text-muted)' }}>
+            Your computer will stay awake while the tunnel is active.
+          </p>
+        </div>
+      )}
+    </Modal>
   );
 }
 
-function StatusBadge({ status, isDark }: { status: NgrokStatus | null; isDark: boolean }) {
-  if (!status) return null;
-
+function StatusBadge({ status }: { status: NgrokStatus }) {
   let label = 'Checking…';
-  let color = isDark ? '#565f89' : '#8b8fa3';
-  let bg = isDark ? 'rgba(86,95,137,0.15)' : 'rgba(139,143,163,0.15)';
+  let color = 'var(--color-text-muted)';
+  let bg = 'var(--color-bg-surface)';
 
   if (!status.installed) {
     label = 'Not Installed';
-    color = isDark ? '#f7768e' : '#cc0000';
-    bg = isDark ? 'rgba(247,118,142,0.12)' : 'rgba(200,0,0,0.08)';
+    color = 'var(--color-error)';
+    bg = 'var(--color-error-subtle)';
   } else if (status.tunnelStatus === 'connected') {
     label = 'Connected';
-    color = '#9ece6a';
+    color = 'var(--color-success)';
     bg = 'rgba(158,206,106,0.12)';
   } else if (status.tunnelStatus === 'connecting') {
     label = 'Connecting…';
-    color = isDark ? '#e0af68' : '#a06800';
-    bg = isDark ? 'rgba(224,175,104,0.12)' : 'rgba(180,120,0,0.08)';
+    color = 'var(--color-warning)';
+    bg = 'var(--color-warning-bg)';
   } else if (status.tunnelStatus === 'error') {
     label = 'Error';
-    color = isDark ? '#f7768e' : '#cc0000';
-    bg = isDark ? 'rgba(247,118,142,0.12)' : 'rgba(200,0,0,0.08)';
+    color = 'var(--color-error)';
+    bg = 'var(--color-error-subtle)';
   } else {
     label = 'Ready';
-    color = isDark ? '#7aa2f7' : '#4060c0';
-    bg = isDark ? 'rgba(122,162,247,0.12)' : 'rgba(64,96,192,0.08)';
+    color = 'var(--color-accent)';
+    bg = 'var(--color-accent-subtle)';
   }
 
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: '3px 10px',
-      borderRadius: '10px',
-      fontSize: '12px',
-      fontWeight: 500,
-      color,
-      background: bg,
-    }}>
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '3px 10px',
+        borderRadius: 'var(--radius-pill)',
+        fontSize: 'var(--text-sm)',
+        fontWeight: 500,
+        color,
+        background: bg,
+      }}
+    >
       {status.tunnelStatus === 'connected' && (
-        <span style={{
-          width: '6px',
-          height: '6px',
-          borderRadius: '50%',
-          background: '#9ece6a',
-          display: 'inline-block',
-        }} />
+        <span
+          style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            background: 'var(--color-success)',
+            display: 'inline-block',
+          }}
+        />
       )}
       {label}
     </span>
   );
 }
 
-interface NotInstalledViewProps {
-  instructions: { steps: { label: string; cmd: string }[]; link: string; linkLabel: string };
-  onRecheck: () => void;
-  onClose: () => void;
-  isDark: boolean;
-  codeBg: string;
-  textMuted: string;
-  textPrimary: string;
-  border: string;
-}
-
 function NotInstalledView({
   instructions,
-  onRecheck,
-  onClose,
-  isDark,
-  codeBg,
-  textMuted,
-  textPrimary,
-  border,
-}: NotInstalledViewProps) {
+}: {
+  instructions: { steps: { label: string; cmd: string }[]; link: string; linkLabel: string };
+}) {
   return (
     <>
-      <p style={{ margin: '0 0 16px', fontSize: '14px', color: textPrimary }}>
+      <p style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-md)', color: 'var(--color-text-primary)' }}>
         ngrok is required to create a public tunnel. Follow the steps below to install it.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: 'var(--space-4)' }}>
         {instructions.steps.map((step, i) => (
           <div key={i}>
-            <p style={{ margin: '0 0 4px', fontSize: '12px', color: textMuted }}>
+            <p style={{ margin: '0 0 4px', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
               {i + 1}. {step.label}
             </p>
-            <div style={{
-              background: codeBg,
-              border: `1px solid ${border}`,
-              borderRadius: '6px',
-              padding: '8px 12px',
-              fontFamily: 'monospace',
-              fontSize: '13px',
-              color: isDark ? '#c0caf5' : '#343b58',
-              userSelect: 'all',
-            }}>
+            <div
+              style={{
+                background: 'var(--color-bg-code)',
+                border: '1px solid var(--color-border-base)',
+                borderRadius: 'var(--radius-md)',
+                padding: '8px 12px',
+                fontFamily: 'monospace',
+                fontSize: 'var(--text-base)',
+                color: 'var(--color-text-primary)',
+                userSelect: 'all',
+              }}
+            >
               {step.cmd}
             </div>
           </div>
@@ -405,42 +275,41 @@ function NotInstalledView({
         href={instructions.link}
         target="_blank"
         rel="noreferrer"
-        style={{ fontSize: '13px', color: isDark ? '#7aa2f7' : '#4060c0', display: 'block', marginBottom: '20px' }}
+        style={{ fontSize: 'var(--text-base)', color: 'var(--color-accent)', display: 'block', marginBottom: 'var(--space-5)' }}
       >
         {instructions.linkLabel}
       </a>
-
-      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-        <button
-          onClick={onClose}
-          style={{
-            padding: '8px 16px',
-            fontSize: '14px',
-            background: 'none',
-            border: `1px solid ${border}`,
-            borderRadius: '6px',
-            cursor: 'pointer',
-            color: textMuted,
-          }}
-        >
-          Close
-        </button>
-        <button
-          onClick={onRecheck}
-          style={{
-            padding: '8px 16px',
-            fontSize: '14px',
-            border: 'none',
-            borderRadius: '6px',
-            background: '#7aa2f7',
-            color: '#ffffff',
-            cursor: 'pointer',
-            fontWeight: 500,
-          }}
-        >
-          Re-check Installation
-        </button>
-      </div>
     </>
   );
 }
+
+function ErrorBox({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        background: 'var(--color-error-subtle)',
+        border: '1px solid var(--color-error)',
+        borderRadius: 'var(--radius-md)',
+        padding: '10px 12px',
+        marginBottom: 'var(--space-4)',
+        fontSize: 'var(--text-base)',
+        color: 'var(--color-error)',
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
+const actionLinkStyle: React.CSSProperties = {
+  background: 'transparent',
+  border: '1px solid var(--color-border-base)',
+  borderRadius: 'var(--radius-sm)',
+  padding: '4px 8px',
+  cursor: 'pointer',
+  fontSize: 'var(--text-sm)',
+  color: 'var(--color-text-muted)',
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
+  transition: 'background var(--transition-fast)',
+};

@@ -4,23 +4,14 @@ import type { Socket } from 'socket.io-client';
 import type { ClientToServerEvents, ServerToClientEvents } from '@remote-orchestrator/shared';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Maximize2, GitCompare, X, GripVertical } from 'lucide-react';
 import { useTerminal } from '../hooks/useTerminal.js';
+import { StatusDot } from './primitives/index.js';
+import { Badge } from './primitives/index.js';
+import { Tooltip } from './primitives/index.js';
+import { STATUS_COLORS, STATUS_LABELS } from '../constants/status.js';
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
-
-const STATUS_COLORS: Record<string, string> = {
-  waiting: '#f59e0b',
-  running: '#3b82f6',
-  idle: '#22c55e',
-  exited: '#6b7280',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  waiting: 'Waiting for input',
-  running: 'Running',
-  idle: 'Idle',
-  exited: 'Exited',
-};
 
 interface TerminalPanelProps {
   session: SessionInfo;
@@ -44,17 +35,22 @@ export function TerminalPanel({ session, socket, theme, onDelete, onFocus, onTog
     transition,
   } = useSortable({ id: `session::${session.id}` });
 
-  const borderColor = STATUS_COLORS[session.status] || STATUS_COLORS.idle;
-  const isDark = theme === 'dark';
+  const borderColor = STATUS_COLORS[session.status] ?? STATUS_COLORS.idle;
 
-  const headerBtnStyle = {
-    background: 'none',
+  const iconBtnStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 26,
+    height: 26,
     border: 'none',
-    color: isDark ? '#565f89' : '#8b8fa3',
+    borderRadius: 'var(--radius-sm)',
+    background: 'transparent',
+    color: 'var(--color-text-muted)',
     cursor: 'pointer',
-    fontSize: '16px',
-    padding: '0 4px',
-    lineHeight: 1,
+    padding: 0,
+    flexShrink: 0,
+    transition: `background var(--transition-fast), color var(--transition-fast)`,
   };
 
   const sortableStyle = {
@@ -69,13 +65,13 @@ export function TerminalPanel({ session, socket, theme, onDelete, onFocus, onTog
       style={{
         ...sortableStyle,
         border: `2px solid ${borderColor}`,
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-lg)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
         minHeight: 0,
         flex: 1,
-        background: isDark ? '#1a1b26' : '#f5f5f5',
+        background: 'var(--color-bg-base)',
       }}
     >
       <div
@@ -84,44 +80,39 @@ export function TerminalPanel({ session, socket, theme, onDelete, onFocus, onTog
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '6px 12px',
-          background: isDark ? '#16161e' : '#e8e8e8',
-          borderBottom: `1px solid ${isDark ? '#2f3549' : '#d0d0d0'}`,
+          padding: '6px 10px',
+          background: 'var(--color-bg-header)',
+          borderBottom: '1px solid var(--color-border-base)',
           flexShrink: 0,
+          gap: 'var(--space-2)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-          <span
-            {...dragAttributes}
-            {...dragListeners}
-            style={{
-              cursor: 'grab',
-              color: isDark ? '#565f89' : '#8b8fa3',
-              flexShrink: 0,
-              userSelect: 'none',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-            title="Drag to reorder"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-              <polygon points="6,0 8,3 7,3 7,5 9,5 9,4 12,6 9,8 9,7 7,7 7,9 8,9 6,12 4,9 5,9 5,7 3,7 3,8 0,6 3,4 3,5 5,5 5,3 4,3" />
-            </svg>
-          </span>
-          <span
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: borderColor,
-              flexShrink: 0,
-            }}
-          />
+        {/* Left: drag + status + name + badge + path */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+          <Tooltip content="Drag to reorder" position="bottom">
+            <span
+              {...dragAttributes}
+              {...dragListeners}
+              style={{
+                cursor: 'grab',
+                color: 'var(--color-text-muted)',
+                flexShrink: 0,
+                userSelect: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}
+            >
+              <GripVertical size={14} strokeWidth={1.75} />
+            </span>
+          </Tooltip>
+
+          <StatusDot status={session.status} pulse={session.status === 'running'} />
+
           <span
             style={{
               fontWeight: 600,
-              fontSize: '13px',
-              color: isDark ? '#c0caf5' : '#343b58',
+              fontSize: 'var(--text-base)',
+              color: 'var(--color-text-primary)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -129,73 +120,90 @@ export function TerminalPanel({ session, socket, theme, onDelete, onFocus, onTog
           >
             {session.name}
           </span>
+
+          <Badge label={session.agentType} />
+
           <span
             style={{
-              fontSize: '10px',
-              padding: '1px 6px',
-              borderRadius: '8px',
-              background: isDark ? '#2d2f42' : '#e4e6f0',
-              color: isDark ? '#7aa2f7' : '#3b5998',
-              fontWeight: 500,
-              flexShrink: 0,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {session.agentType}
-          </span>
-          <span
-            style={{
-              fontSize: '11px',
-              color: isDark ? '#565f89' : '#8b8fa3',
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-muted)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
+              fontFamily: 'var(--font-mono)',
             }}
           >
             {session.folderPath}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+
+        {/* Right: status label + action buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
           <span
             style={{
-              fontSize: '11px',
+              fontSize: 'var(--text-xs)',
               color: borderColor,
               textTransform: 'uppercase',
-              fontWeight: 500,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              marginRight: '4px',
             }}
           >
             {STATUS_LABELS[session.status]}
           </span>
+
           {onToggleDiff && (
-            <button
-              onClick={() => onToggleDiff(session.id)}
-              style={{
-                ...headerBtnStyle,
-                color: isDiffOpen ? '#7aa2f7' : headerBtnStyle.color,
-              }}
-              title="Toggle diff view"
-            >
-              {'\u2A25'}
-            </button>
+            <Tooltip content="Toggle diff view" position="top">
+              <button
+                onClick={() => onToggleDiff(session.id)}
+                style={{
+                  ...iconBtnStyle,
+                  color: isDiffOpen ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                  background: isDiffOpen ? 'var(--color-accent-subtle)' : 'transparent',
+                }}
+                aria-label="Toggle diff view"
+                onMouseEnter={(e) => { if (!isDiffOpen) e.currentTarget.style.background = 'var(--color-bg-surface)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = isDiffOpen ? 'var(--color-accent-subtle)' : 'transparent'; }}
+              >
+                <GitCompare size={14} strokeWidth={1.75} />
+              </button>
+            </Tooltip>
           )}
+
           {onFocus && (
-            <button
-              onClick={() => onFocus(session.id)}
-              style={headerBtnStyle}
-              title="Focus session"
-            >
-              {'\u2922'}
-            </button>
+            <Tooltip content="Focus session" position="top">
+              <button
+                onClick={() => onFocus(session.id)}
+                style={iconBtnStyle}
+                aria-label="Focus session"
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-surface)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <Maximize2 size={14} strokeWidth={1.75} />
+              </button>
+            </Tooltip>
           )}
-          <button
-            onClick={() => onDelete(session.id)}
-            style={headerBtnStyle}
-            title="Close session"
-          >
-            {'\u2715'}
-          </button>
+
+          <Tooltip content="Close session" position="top">
+            <button
+              onClick={() => onDelete(session.id)}
+              style={iconBtnStyle}
+              aria-label="Close session"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--color-error-subtle)';
+                e.currentTarget.style.color = 'var(--color-error)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = 'var(--color-text-muted)';
+              }}
+            >
+              <X size={14} strokeWidth={1.75} />
+            </button>
+          </Tooltip>
         </div>
       </div>
+
       <div
         ref={containerRef}
         style={{

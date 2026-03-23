@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTheme } from './context/ThemeContext.js';
+import { Styleguide } from './components/styleguide/Styleguide.js';
 import { useSocket } from './hooks/useSocket.js';
 import { useSessions } from './hooks/useSessions.js';
 import { useSessionOrder } from './hooks/useSessionOrder.js';
@@ -11,21 +13,13 @@ import { NgrokModal } from './components/NgrokModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { api } from './services/api.js';
 
-type Theme = 'dark' | 'light';
-
 interface DiffState {
   isOpen: boolean;
   isFullscreen: boolean;
 }
 
-function getInitialTheme(): Theme {
-  const stored = localStorage.getItem('theme');
-  if (stored === 'dark' || stored === 'light') return stored;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
 export default function App() {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const { theme, isDark, toggle: toggleTheme } = useTheme();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [pickedFolder, setPickedFolder] = useState<string | null>(null);
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null);
@@ -34,26 +28,18 @@ export default function App() {
   const [showNgrokModal, setShowNgrokModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [cloneModalState, setCloneModalState] = useState<{ folderPath: string; agentType?: string } | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const socket = useSocket();
   const { sessions, createSession, deleteSession } = useSessions(socket);
   const ngrok = useNgrok(socket);
   const { config, updateConfig } = useConfig();
   const { getOrderedSessions, reorder } = useSessionOrder();
 
-  const isDark = theme === 'dark';
-
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handler);
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
-
-  useEffect(() => {
-    document.body.style.background = isDark ? '#1a1b26' : '#f5f5f5';
-    document.body.style.color = isDark ? '#c0caf5' : '#343b58';
-    document.body.style.margin = '0';
-    document.body.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  }, [isDark]);
 
   const triggerRefit = useCallback(() => {
     for (const delay of [50, 150, 350]) {
@@ -108,14 +94,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [focusedSessionId, getDiffState, setDiffState, triggerRefit]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('theme', next);
-      return next;
-    });
-  }, []);
-
   const handleNewSession = useCallback(async () => {
     const path = await api.pickFolder();
     if (path) {
@@ -136,14 +114,18 @@ export default function App() {
     await createSession(folderPath, undefined, agentType);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Close this session? The Claude process will be terminated.')) {
-      if (focusedSessionId === id) {
-        setFocusedSessionId(null);
-      }
-      await deleteSession(id);
+  const handleDelete = useCallback((id: string) => {
+    setPendingDeleteId(id);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!pendingDeleteId) return;
+    if (focusedSessionId === pendingDeleteId) {
+      setFocusedSessionId(null);
     }
-  };
+    await deleteSession(pendingDeleteId);
+    setPendingDeleteId(null);
+  }, [pendingDeleteId, focusedSessionId, deleteSession]);
 
   const handleFocus = useCallback((id: string) => {
     setFocusedSessionId(id);
@@ -159,7 +141,6 @@ export default function App() {
       if (ds.isOpen) {
         setDiffState(sessionId, { isOpen: false, isFullscreen: false });
       } else {
-        // In grid view, auto-focus first then open diff
         if (focusedSessionId !== sessionId) {
           setFocusedSessionId(sessionId);
         }
@@ -188,6 +169,47 @@ export default function App() {
   );
 
   const orderedSessions = getOrderedSessions(sessions);
+  const isStyleguide = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('styleguide');
+
+  const ngrokBorderColor = ngrok.status?.tunnelStatus === 'connected'
+    ? 'var(--color-success)'
+    : 'var(--color-border-subtle)';
+  const ngrokColor = ngrok.status?.tunnelStatus === 'connected'
+    ? 'var(--color-success)'
+    : 'var(--color-text-secondary)';
+
+  if (isStyleguide) {
+    return (
+      <div style={{ height: '100vh', background: 'var(--color-bg-base)', overflow: 'hidden' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          height: 'var(--header-height)',
+          padding: '0 var(--space-4)',
+          background: 'var(--color-bg-header)',
+          borderBottom: '1px solid var(--color-border-base)',
+          gap: 'var(--space-3)',
+        }}>
+          <span style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+            Code Orchestrator
+          </span>
+          <span style={{
+            fontSize: 'var(--text-sm)',
+            background: 'var(--color-accent-subtle)',
+            color: 'var(--color-accent)',
+            padding: '2px 8px',
+            borderRadius: 'var(--radius-pill)',
+            fontWeight: 500,
+          }}>
+            Design System
+          </span>
+        </div>
+        <div style={{ height: 'calc(100vh - var(--header-height))', overflowY: 'auto' }}>
+          <Styleguide />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -196,85 +218,44 @@ export default function App() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          height: '52px',
-          padding: '0 16px',
-          background: isDark ? '#16161e' : '#e8e8e8',
-          borderBottom: `1px solid ${isDark ? '#2f3549' : '#d0d0d0'}`,
+          height: 'var(--header-height)',
+          padding: '0 var(--space-4)',
+          background: 'var(--color-bg-header)',
+          borderBottom: '1px solid var(--color-border-base)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '16px', fontWeight: 700 }}>Code Orchestrator</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <span style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+            Code Orchestrator
+          </span>
           <span
             style={{
-              fontSize: '12px',
-              color: isDark ? '#565f89' : '#8b8fa3',
-              background: isDark ? '#1a1b26' : '#f0f0f0',
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-muted)',
+              background: 'var(--color-bg-base)',
               padding: '2px 8px',
-              borderRadius: '10px',
+              borderRadius: 'var(--radius-pill)',
             }}
           >
             {sessions.length} session{sessions.length !== 1 ? 's' : ''}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={() => setShowSettingsModal(true)}
-            style={{
-              background: 'none',
-              border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-              borderRadius: '6px',
-              padding: '0',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: '14px',
-              color: isDark ? '#a9b1d6' : '#565c73',
-            }}
-            title="Settings"
-          >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          {/* Settings */}
+          <HeaderButton onClick={() => setShowSettingsModal(true)} title="Settings">
             {'\u2699'}
-          </button>
-          <button
-            onClick={toggleFullscreen}
-            style={{
-              background: 'none',
-              border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-              borderRadius: '6px',
-              padding: '0',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: '14px',
-              color: isDark ? '#a9b1d6' : '#565c73',
-            }}
-            title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-          >
+          </HeaderButton>
+
+          {/* Fullscreen */}
+          <HeaderButton onClick={toggleFullscreen} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
             {isFullscreen ? '\u2716' : '\u26F6'}
-          </button>
-          <button
+          </HeaderButton>
+
+          {/* Remote access */}
+          <HeaderButton
             onClick={() => setShowNgrokModal(true)}
-            style={{
-              position: 'relative',
-              background: 'none',
-              border: `1px solid ${ngrok.status?.tunnelStatus === 'connected' ? '#9ece6a' : isDark ? '#3b4261' : '#c0c0c0'}`,
-              borderRadius: '6px',
-              padding: '0',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: '14px',
-              color: ngrok.status?.tunnelStatus === 'connected' ? '#9ece6a' : isDark ? '#a9b1d6' : '#565c73',
-            }}
             title={ngrok.status?.tunnelStatus === 'connected' ? `Remote: ${ngrok.status.publicUrl}` : 'Remote Access'}
+            style={{ position: 'relative', borderColor: ngrokBorderColor, color: ngrokColor }}
           >
             {'\uD83C\uDF10'}
             {ngrok.status?.tunnelStatus === 'connected' && (
@@ -285,31 +266,18 @@ export default function App() {
                 width: '7px',
                 height: '7px',
                 borderRadius: '50%',
-                background: '#9ece6a',
-                border: `2px solid ${isDark ? '#16161e' : '#e8e8e8'}`,
+                background: 'var(--color-success)',
+                border: '2px solid var(--color-bg-header)',
               }} />
             )}
-          </button>
-          <button
-            onClick={toggleTheme}
-            style={{
-              background: 'none',
-              border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-              borderRadius: '6px',
-              padding: '0',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: '14px',
-              color: isDark ? '#a9b1d6' : '#565c73',
-            }}
-            title="Toggle theme"
-          >
+          </HeaderButton>
+
+          {/* Theme toggle */}
+          <HeaderButton onClick={toggleTheme} title="Toggle theme">
             {isDark ? '\u2600' : '\u263E'}
-          </button>
+          </HeaderButton>
+
+          {/* New Session */}
           <button
             onClick={handleNewSession}
             style={{
@@ -317,14 +285,18 @@ export default function App() {
               height: '32px',
               display: 'flex',
               alignItems: 'center',
-              fontSize: '14px',
+              fontSize: 'var(--text-md)',
               border: '1px solid transparent',
-              borderRadius: '6px',
-              background: '#7aa2f7',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-accent)',
               color: '#ffffff',
               cursor: 'pointer',
               fontWeight: 500,
+              gap: '6px',
+              transition: 'opacity var(--transition-fast)',
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
           >
             + New Session
           </button>
@@ -395,6 +367,123 @@ export default function App() {
           onRecheck={ngrok.recheckInstallation}
         />
       )}
+
+      {/* Confirm delete dialog */}
+      {pendingDeleteId && (
+        <div
+          onClick={() => setPendingDeleteId(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 'var(--z-modal-top)' as unknown as number,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'var(--color-bg-modal)',
+              borderRadius: 'var(--radius-xl)',
+              padding: 'var(--space-6)',
+              width: '360px',
+              maxWidth: '90vw',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+              border: '1px solid var(--color-border-base)',
+            }}
+          >
+            <h3 style={{ margin: '0 0 8px', fontSize: 'var(--text-xl)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              Close Session?
+            </h3>
+            <p style={{ margin: '0 0 20px', fontSize: 'var(--text-md)', color: 'var(--color-text-secondary)' }}>
+              The Claude process will be terminated.
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setPendingDeleteId(null)}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: 'var(--text-md)',
+                  border: '1px solid var(--color-border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'transparent',
+                  color: 'var(--color-text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'background var(--transition-fast)',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-surface)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: 'var(--text-md)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--color-error)',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'opacity var(--transition-fast)',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+              >
+                Close Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
+  );
+}
+
+/** Small icon button used in the app header. */
+function HeaderButton({
+  onClick,
+  title,
+  children,
+  style,
+}: {
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        background: 'none',
+        border: '1px solid var(--color-border-subtle)',
+        borderRadius: 'var(--radius-md)',
+        padding: '0',
+        width: '32px',
+        height: '32px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        fontSize: 'var(--text-md)',
+        color: 'var(--color-text-secondary)',
+        transition: 'background var(--transition-fast)',
+        ...style,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--color-bg-surface)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'none';
+      }}
+    >
+      {children}
+    </button>
   );
 }

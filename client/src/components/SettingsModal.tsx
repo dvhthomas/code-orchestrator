@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import type { AgentDefinition, AgentStatus, AppConfig } from '@remote-orchestrator/shared';
+import { X } from 'lucide-react';
 import { api } from '../services/api.js';
+import { Modal } from './primitives/index.js';
+import { Button } from './primitives/index.js';
+import { Skeleton } from './primitives/index.js';
 
 interface SettingsModalProps {
   config: AppConfig;
@@ -14,8 +18,7 @@ function agentAbbrev(agent: AgentDefinition): string {
   return abbrevs[agent.id] || agent.name.slice(0, 3);
 }
 
-export function SettingsModal({ config, onClose, onSave, theme }: SettingsModalProps) {
-  const isDark = theme === 'dark';
+export function SettingsModal({ config, onClose, onSave }: SettingsModalProps) {
   const [defaultAgent, setDefaultAgent] = useState(config.defaultAgent);
   const [customAgents, setCustomAgents] = useState<AgentDefinition[]>(config.customAgents);
   const [agentStatuses, setAgentStatuses] = useState<AgentStatus[]>([]);
@@ -66,278 +69,252 @@ export function SettingsModal({ config, onClose, onSave, theme }: SettingsModalP
     navigator.clipboard.writeText(text).catch(console.error);
   };
 
-  const inputStyle = {
-    padding: '6px 10px',
-    fontSize: '13px',
-    border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-    borderRadius: '6px',
-    background: isDark ? '#1a1b26' : '#ffffff',
-    color: isDark ? '#c0caf5' : '#343b58',
-    outline: 'none',
-    boxSizing: 'border-box' as const,
-  };
-
-  const labelStyle = {
-    display: 'block',
-    marginBottom: '6px',
-    fontSize: '12px',
-    fontWeight: 600,
-    color: isDark ? '#a9b1d6' : '#565c73',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
-  };
-
   const allAgents: AgentDefinition[] = [
     ...agentStatuses.map((s) => s.agent),
     ...customAgents,
   ];
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 100,
-      }}
-      onClick={onClose}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Settings"
+      size="md"
+      maxHeight="85vh"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={saving} onClick={handleSave}>Save</Button>
+        </>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: isDark ? '#24283b' : '#ffffff',
-          borderRadius: '12px',
-          padding: '24px',
-          width: '580px',
-          maxWidth: '90vw',
-          maxHeight: '85vh',
-          overflowY: 'auto',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        }}
-      >
-        <h2
-          style={{
-            margin: '0 0 20px 0',
-            fontSize: '18px',
-            fontWeight: 600,
-            color: isDark ? '#c0caf5' : '#343b58',
-          }}
+      {/* Default Agent */}
+      <section style={{ marginBottom: 'var(--space-6)' }}>
+        <label style={sectionLabel}>Default Agent</label>
+        <select
+          value={defaultAgent}
+          onChange={(e) => setDefaultAgent(e.target.value)}
+          style={selectStyle}
         >
-          Settings
-        </h2>
+          {allAgents.map((agent) => (
+            <option key={agent.id} value={agent.id}>
+              {agent.name}{!agent.builtin ? ' (custom)' : ''}
+            </option>
+          ))}
+        </select>
+      </section>
 
-        {/* Default Agent */}
-        <div style={{ marginBottom: '24px' }}>
-          <label style={labelStyle}>Default Agent</label>
-          <select
-            value={defaultAgent}
-            onChange={(e) => setDefaultAgent(e.target.value)}
-            style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}
-          >
-            {allAgents.map((agent) => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name}{!agent.builtin ? ' (custom)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Agent Status */}
-        <div style={{ marginBottom: '24px' }}>
-          <label style={labelStyle}>Agent Status</label>
-          {detecting ? (
-            <div style={{ fontSize: '13px', color: isDark ? '#565f89' : '#8b8fa3' }}>Detecting installed agents...</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {agentStatuses.map(({ agent, installed, resolvedPath }) => (
-                <div
-                  key={agent.id}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: `1px solid ${isDark ? '#3b4261' : '#e0e0e0'}`,
-                    background: isDark ? '#1e1f2e' : '#f8f8f8',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: installed ? 0 : '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: installed ? '#22c55e' : '#f7768e',
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: isDark ? '#c0caf5' : '#343b58' }}>
-                        {agent.name}
-                      </span>
-                      <span style={{ fontSize: '11px', color: isDark ? '#565f89' : '#8b8fa3', fontFamily: 'Menlo, Monaco, monospace' }}>
-                        {agent.command}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '11px', color: installed ? '#22c55e' : '#f7768e', fontWeight: 500 }}>
-                      {installed ? (resolvedPath || 'installed') : 'not installed'}
+      {/* Agent Status */}
+      <section style={{ marginBottom: 'var(--space-6)' }}>
+        <label style={sectionLabel}>Agent Status</label>
+        {detecting ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <Skeleton height="56px" borderRadius="var(--radius-lg)" />
+            <Skeleton height="56px" borderRadius="var(--radius-lg)" />
+            <Skeleton height="56px" borderRadius="var(--radius-lg)" />
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {agentStatuses.map(({ agent, installed, resolvedPath }) => (
+              <div
+                key={agent.id}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--color-border-base)',
+                  background: 'var(--color-bg-surface)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: installed ? 0 : '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: installed ? 'var(--color-success)' : 'var(--color-error)',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                      {agent.name}
+                    </span>
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+                      {agent.command}
                     </span>
                   </div>
-                  {!installed && agent.installCommand && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                      <code
-                        style={{
-                          flex: 1,
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          background: isDark ? '#16161e' : '#f0f0f0',
-                          color: isDark ? '#7aa2f7' : '#3b5998',
-                          fontSize: '12px',
-                          fontFamily: 'Menlo, Monaco, monospace',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {agent.installCommand}
-                      </code>
-                      <button
-                        onClick={() => handleCopy(agent.installCommand!)}
-                        title="Copy install command"
-                        style={{
-                          background: 'none',
-                          border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-                          borderRadius: '4px',
-                          padding: '4px 8px',
-                          cursor: 'pointer',
-                          fontSize: '11px',
-                          color: isDark ? '#a9b1d6' : '#565c73',
-                          flexShrink: 0,
-                        }}
-                      >
-                        Copy
-                      </button>
-                    </div>
-                  )}
+                  <span style={{ fontSize: 'var(--text-sm)', color: installed ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 500 }}>
+                    {installed ? (resolvedPath || 'installed') : 'not installed'}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Custom Agents */}
-        <div style={{ marginBottom: '24px' }}>
-          <label style={labelStyle}>Custom Agents</label>
-          {customAgents.length === 0 && (
-            <div style={{ fontSize: '13px', color: isDark ? '#565f89' : '#8b8fa3', marginBottom: '8px' }}>
-              No custom agents configured.
-            </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {customAgents.map((agent) => (
-              <div key={agent.id} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input
-                  type="text"
-                  placeholder="Name (e.g. Aider)"
-                  value={agent.name}
-                  onChange={(e) => handleUpdateCustomAgent(agent.id, 'name', e.target.value)}
-                  style={{ ...inputStyle, flex: '0 0 40%' }}
-                />
-                <input
-                  type="text"
-                  placeholder="Command (e.g. aider)"
-                  value={agent.command}
-                  onChange={(e) => handleUpdateCustomAgent(agent.id, 'command', e.target.value)}
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                <button
-                  onClick={() => handleRemoveCustomAgent(agent.id)}
-                  title="Remove"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: isDark ? '#565f89' : '#8b8fa3',
-                    cursor: 'pointer',
-                    fontSize: '16px',
-                    padding: '0 4px',
-                    flexShrink: 0,
-                  }}
-                >
-                  {'\u2715'}
-                </button>
+                {!installed && agent.installCommand && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: '8px' }}>
+                    <code
+                      style={{
+                        flex: 1,
+                        padding: '4px 8px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'var(--color-bg-code)',
+                        color: 'var(--color-accent)',
+                        fontSize: 'var(--text-sm)',
+                        fontFamily: 'var(--font-mono)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {agent.installCommand}
+                    </code>
+                    <button
+                      onClick={() => handleCopy(agent.installCommand!)}
+                      title="Copy install command"
+                      style={copyBtnStyle}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-elevated)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
-          <button
-            onClick={handleAddCustomAgent}
-            style={{
-              marginTop: '8px',
-              padding: '6px 12px',
-              fontSize: '13px',
-              border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-              borderRadius: '6px',
-              background: 'transparent',
-              color: isDark ? '#7aa2f7' : '#3b5998',
-              cursor: 'pointer',
-            }}
-          >
-            + Add Custom Agent
-          </button>
-        </div>
+        )}
+      </section>
 
-        {error && (
-          <div
-            style={{
-              marginBottom: '16px',
-              padding: '8px 12px',
-              background: isDark ? '#3b2030' : '#fee2e2',
-              color: '#f7768e',
-              borderRadius: '6px',
-              fontSize: '13px',
-            }}
-          >
-            {error}
+      {/* Custom Agents */}
+      <section style={{ marginBottom: 'var(--space-6)' }}>
+        <label style={sectionLabel}>Custom Agents</label>
+        {customAgents.length === 0 && (
+          <div style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' }}>
+            No custom agents configured.
           </div>
         )}
-
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              fontSize: '14px',
-              border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
-              borderRadius: '6px',
-              background: 'transparent',
-              color: isDark ? '#a9b1d6' : '#565c73',
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={{
-              padding: '8px 16px',
-              fontSize: '14px',
-              border: 'none',
-              borderRadius: '6px',
-              background: '#7aa2f7',
-              color: '#ffffff',
-              cursor: saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.6 : 1,
-              fontWeight: 500,
-            }}
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {customAgents.map((agent) => (
+            <div key={agent.id} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Name (e.g. Aider)"
+                value={agent.name}
+                onChange={(e) => handleUpdateCustomAgent(agent.id, 'name', e.target.value)}
+                style={{ ...inputStyle, flex: '0 0 40%' }}
+              />
+              <input
+                type="text"
+                placeholder="Command (e.g. aider)"
+                value={agent.command}
+                onChange={(e) => handleUpdateCustomAgent(agent.id, 'command', e.target.value)}
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <button
+                onClick={() => handleRemoveCustomAgent(agent.id)}
+                title="Remove agent"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 28,
+                  height: 28,
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--color-text-muted)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  flexShrink: 0,
+                  borderRadius: 'var(--radius-sm)',
+                  transition: 'color var(--transition-fast), background var(--transition-fast)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--color-error)';
+                  e.currentTarget.style.background = 'var(--color-error-subtle)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--color-text-muted)';
+                  e.currentTarget.style.background = 'none';
+                }}
+              >
+                <X size={14} strokeWidth={2} />
+              </button>
+            </div>
+          ))}
         </div>
-      </div>
-    </div>
+        <button
+          onClick={handleAddCustomAgent}
+          style={{
+            marginTop: 'var(--space-2)',
+            padding: '6px 12px',
+            fontSize: 'var(--text-base)',
+            border: '1px solid var(--color-border-subtle)',
+            borderRadius: 'var(--radius-md)',
+            background: 'transparent',
+            color: 'var(--color-accent)',
+            cursor: 'pointer',
+            transition: 'background var(--transition-fast)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-accent-subtle)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          + Add Custom Agent
+        </button>
+      </section>
+
+      {error && (
+        <div
+          style={{
+            marginBottom: 'var(--space-4)',
+            padding: '8px 12px',
+            background: 'var(--color-error-bg)',
+            color: 'var(--color-error)',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--text-base)',
+          }}
+        >
+          {error}
+        </div>
+      )}
+    </Modal>
   );
 }
 
 export { agentAbbrev };
+
+const sectionLabel: React.CSSProperties = {
+  display: 'block',
+  marginBottom: '8px',
+  fontSize: 'var(--text-sm)',
+  fontWeight: 600,
+  color: 'var(--color-text-secondary)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+};
+
+const inputStyle: React.CSSProperties = {
+  padding: '6px 10px',
+  fontSize: 'var(--text-base)',
+  border: '1px solid var(--color-border-subtle)',
+  borderRadius: 'var(--radius-md)',
+  background: 'var(--color-bg-input)',
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
+
+const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  width: '100%',
+  cursor: 'pointer',
+};
+
+const copyBtnStyle: React.CSSProperties = {
+  background: 'transparent',
+  border: '1px solid var(--color-border-subtle)',
+  borderRadius: 'var(--radius-sm)',
+  padding: '4px 8px',
+  cursor: 'pointer',
+  fontSize: 'var(--text-sm)',
+  color: 'var(--color-text-secondary)',
+  flexShrink: 0,
+  transition: 'background var(--transition-fast)',
+};
