@@ -69,8 +69,12 @@ export const api = {
     return res.json();
   },
 
-  startNgrok: async (): Promise<NgrokStartResponse> => {
-    const res = await fetch(`${API_BASE}/ngrok/start`, { method: 'POST' });
+  startNgrok: async (port: number = 5173): Promise<NgrokStartResponse> => {
+    const res = await fetch(`${API_BASE}/ngrok/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ port }),
+    });
     if (!res.ok) {
       const err = await res.json() as { error?: string };
       throw new Error(err.error || 'Failed to start ngrok');

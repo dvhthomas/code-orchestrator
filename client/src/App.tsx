@@ -6,6 +6,7 @@ import { useNgrok } from './hooks/useNgrok.js';
 import { useConfig } from './hooks/useConfig.js';
 import { Dashboard } from './components/Dashboard.js';
 import { CreateSessionModal } from './components/CreateSessionModal.js';
+import { CloneSessionModal } from './components/CloneSessionModal.js';
 import { NgrokModal } from './components/NgrokModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { api } from './services/api.js';
@@ -32,6 +33,7 @@ export default function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showNgrokModal, setShowNgrokModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [cloneModalState, setCloneModalState] = useState<{ folderPath: string; agentType?: string } | null>(null);
   const socket = useSocket();
   const { sessions, createSession, deleteSession } = useSessions(socket);
   const ngrok = useNgrok(socket);
@@ -137,12 +139,13 @@ export default function App() {
     await createSession(folderPath, name, agentType);
   };
 
-  const handleClone = useCallback(
-    async (folderPath: string, agentType?: string) => {
-      await createSession(folderPath, undefined, agentType);
-    },
-    [createSession],
-  );
+  const handleClone = useCallback((folderPath: string, agentType?: string) => {
+    setCloneModalState({ folderPath, agentType });
+  }, []);
+
+  const handleCloneConfirm = async (folderPath: string, agentType: string) => {
+    await createSession(folderPath, undefined, agentType);
+  };
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Close this session? The Claude process will be terminated.')) {
@@ -211,7 +214,7 @@ export default function App() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '16px', fontWeight: 700 }}>Remote Orchestrator</span>
+          <span style={{ fontSize: '16px', fontWeight: 700 }}>Code Orchestrator</span>
           <span
             style={{
               fontSize: '12px',
@@ -367,6 +370,18 @@ export default function App() {
           initialFolderPath={pickedFolder}
           defaultAgentType={config?.defaultAgent}
           agents={config ? [...[{ id: 'claude', name: 'Claude', command: 'claude', builtin: true }, { id: 'gemini', name: 'Gemini CLI', command: 'gemini', builtin: true }, { id: 'codex', name: 'Codex', command: 'codex', builtin: true }], ...config.customAgents] : []}
+        />
+      )}
+
+      {cloneModalState && (
+        <CloneSessionModal
+          folderPath={cloneModalState.folderPath}
+          currentAgentType={cloneModalState.agentType}
+          defaultAgentType={config?.defaultAgent}
+          agents={config ? [...[{ id: 'claude', name: 'Claude', command: 'claude', builtin: true }, { id: 'gemini', name: 'Gemini CLI', command: 'gemini', builtin: true }, { id: 'codex', name: 'Codex', command: 'codex', builtin: true }], ...config.customAgents] : []}
+          theme={theme}
+          onClone={handleCloneConfirm}
+          onClose={() => setCloneModalState(null)}
         />
       )}
 

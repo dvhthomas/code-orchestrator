@@ -1,4 +1,4 @@
-# Remote Orchestrator
+# Code Orchestrator
 
 A web-based dashboard for managing multiple [Claude Code](https://claude.ai/code) CLI sessions simultaneously. Spawn `claude` processes via pseudo-terminals, stream their I/O to browser-based terminals, and monitor session state in real time.
 

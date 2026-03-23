@@ -87,7 +87,10 @@
       "Bash(git -C /Users/macbookpro10/development/Rebrandly/rebrandly_api/api-product diff --cached --stat)",
       "Bash(git -C /Users/macbookpro10/development/Rebrandly/rebrandly_api/api-product status --short)",
       "Bash(git:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(bash -n /Users/macbookpro10/development/projects/remote-orchestrator/setup.sh)",
+      "Bash(bash -n /Users/macbookpro10/development/projects/remote-orchestrator/bin/swarm.sh)",
+      "Bash(node:*)"
     ]
   }
 }

@@ -1,6 +1,6 @@
 import type { SessionStatus } from '@remote-orchestrator/shared';
 
-const STRIP_ANSI = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?(\x07|\x1b\\)/g;
+const STRIP_ANSI = /\x1b\[[0-9;?>=]*[a-zA-Z~]|\x1b\].*?(\x07|\x1b\\)|\x1b[()#][A-Z0-9]|\x1b[\x20-\x2f]*[\x30-\x7e]|\r/g;
 
 const AGENT_PROMPT_PATTERNS: Record<string, RegExp[]> = {
   claude: [
@@ -11,6 +11,9 @@ const AGENT_PROMPT_PATTERNS: Record<string, RegExp[]> = {
     /Press Enter to continue/i,
     /Allow once/i,
     /Do you want to/i,
+    /Would you like to/i,
+    /Esc to cancel/i,
+    /Enter to confirm/i,
   ],
   gemini: [
     />\s*$/,
@@ -53,7 +56,7 @@ export class StateDetector {
   }
 
   feed(data: string): void {
-    const stripped = data.replace(STRIP_ANSI, '');
+    const stripped = data.replace(STRIP_ANSI, '').replace(/\x1b/g, '');
     this.buffer += stripped;
 
     // Keep buffer at reasonable size
@@ -74,7 +77,7 @@ export class StateDetector {
   }
 
   private checkForPrompt(): void {
-    const tail = this.buffer.slice(-300).trim();
+    const tail = this.buffer.slice(-500).trim();
 
     for (const pattern of this.promptPatterns) {
       if (pattern.test(tail)) {

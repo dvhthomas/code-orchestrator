@@ -8,13 +8,14 @@ export function createNgrokRoutes(ngrokService: NgrokService): Router {
     res.json(ngrokService.getStatus());
   });
 
-  router.post('/start', async (_req, res) => {
+  router.post('/start', async (req, res) => {
     if (!ngrokService.installed) {
       res.status(400).json({ error: 'ngrok is not installed' });
       return;
     }
     try {
-      const publicUrl = await ngrokService.start();
+      const port = typeof req.body?.port === 'number' ? req.body.port : 5173;
+      const publicUrl = await ngrokService.start(port);
       res.json({ publicUrl });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start ngrok';
