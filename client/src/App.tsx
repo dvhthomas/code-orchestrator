@@ -7,12 +7,14 @@ import { useSessionOrder } from './hooks/useSessionOrder.js';
 import { useNgrok } from './hooks/useNgrok.js';
 import { useConfig } from './hooks/useConfig.js';
 import { useGitDiff } from './hooks/useGitDiff.js';
+import type { SessionInfo } from '@remote-orchestrator/shared';
 import { Dashboard } from './components/Dashboard.js';
 import { CreateSessionModal } from './components/CreateSessionModal.js';
 import { CloneSessionModal } from './components/CloneSessionModal.js';
 import { NgrokModal } from './components/NgrokModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { GitDiffPanel } from './components/GitDiffPanel.js';
+import { ExplorerPanel } from './components/ExplorerPanel.js';
 import { NavTabs } from './components/NavTabs.js';
 import type { AppTab } from './components/NavTabs.js';
 import { MobileBottomNav } from './components/MobileBottomNav.js';
@@ -143,6 +145,12 @@ export default function App() {
 
   const handleToggleDiff = useCallback(
     (sessionId: string) => {
+      // On mobile, navigate to the git-diff tab rather than splitting the card
+      if (window.innerWidth < 768) {
+        setFocusedSessionId(sessionId);
+        setActiveTab('git-diff');
+        return;
+      }
       const ds = getDiffState(sessionId);
       if (ds.isOpen) {
         setDiffState(sessionId, { isOpen: false, isFullscreen: false });
@@ -338,6 +346,9 @@ export default function App() {
           sessionId={focusedSessionId ?? sessions[0].id}
           sessionStatus={sessions.find(s => s.id === (focusedSessionId ?? sessions[0].id))?.status ?? 'idle'}
           theme={theme}
+          sessions={sessions}
+          currentSessionId={focusedSessionId ?? sessions[0].id}
+          onSelectSession={setFocusedSessionId}
         />
       )}
       {activeTab === 'git-diff' && sessions.length === 0 && (
@@ -351,6 +362,9 @@ export default function App() {
         }}>
           No sessions — create a session to view git diff
         </div>
+      )}
+      {activeTab === 'explorer' && (
+        <ExplorerPanel sessions={orderedSessions} theme={theme} />
       )}
 
       {showCreateModal && (
@@ -487,10 +501,16 @@ function GlobalGitDiffView({
   sessionId,
   sessionStatus,
   theme,
+  sessions,
+  currentSessionId,
+  onSelectSession,
 }: {
   sessionId: string;
   sessionStatus: string;
   theme: 'dark' | 'light';
+  sessions: SessionInfo[];
+  currentSessionId: string;
+  onSelectSession: (id: string) => void;
 }) {
   const { diff, isLoading, error, refresh } = useGitDiff({
     sessionId,
@@ -506,6 +526,9 @@ function GlobalGitDiffView({
         isLoading={isLoading}
         error={error}
         isFullscreen={false}
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        onSelectSession={onSelectSession}
         onClose={() => {}}
         onToggleFullscreen={() => {}}
         onRefresh={refresh}

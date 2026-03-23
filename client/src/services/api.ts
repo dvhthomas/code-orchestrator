@@ -1,4 +1,4 @@
-import type { SessionInfo, CreateSessionRequest, PathCompletionResponse, DirectoryChildrenResponse, GitDiffResponse, NgrokStatus, NgrokStartResponse, AppConfig, AgentDetectionResponse } from '@remote-orchestrator/shared';
+import type { SessionInfo, CreateSessionRequest, PathCompletionResponse, DirectoryChildrenResponse, FileContentResponse, FileSearchResponse, GitDiffResponse, NgrokStatus, NgrokStartResponse, AppConfig, AgentDetectionResponse } from '@remote-orchestrator/shared';
 
 const API_BASE = '/api';
 
@@ -37,11 +37,26 @@ export const api = {
     return data.path;
   },
 
-  getDirectoryChildren: async (dirPath?: string): Promise<DirectoryChildrenResponse> => {
-    const url = dirPath
-      ? `${API_BASE}/fs/children?path=${encodeURIComponent(dirPath)}`
-      : `${API_BASE}/fs/children`;
-    const res = await fetch(url);
+  getDirectoryChildren: async (dirPath?: string, includeFiles = false): Promise<DirectoryChildrenResponse> => {
+    const params = new URLSearchParams();
+    if (dirPath) params.set('path', dirPath);
+    if (includeFiles) params.set('includeFiles', 'true');
+    const res = await fetch(`${API_BASE}/fs/children?${params}`);
+    return res.json();
+  },
+
+  searchFiles: async (rootPath: string, query: string): Promise<FileSearchResponse> => {
+    const params = new URLSearchParams({ path: rootPath, q: query });
+    const res = await fetch(`${API_BASE}/fs/search?${params}`);
+    return res.json();
+  },
+
+  getFileContent: async (filePath: string): Promise<FileContentResponse> => {
+    const res = await fetch(`${API_BASE}/fs/file?path=${encodeURIComponent(filePath)}`);
+    if (!res.ok) {
+      const err = await res.json() as { error: string };
+      throw new Error(err.error);
+    }
     return res.json();
   },
 

@@ -1,8 +1,38 @@
+import type { ReactNode } from 'react';
 import type parseDiff from 'parse-diff';
 
 interface DiffHunkProps {
   chunk: parseDiff.Chunk;
   theme: 'dark' | 'light';
+  searchQuery?: string;
+}
+
+function highlightText(text: string, query: string): ReactNode {
+  const lower = text.toLowerCase();
+  const queryLower = query.toLowerCase();
+  const parts: ReactNode[] = [];
+  let last = 0;
+  let idx = lower.indexOf(queryLower, last);
+  while (idx !== -1) {
+    if (idx > last) parts.push(text.slice(last, idx));
+    parts.push(
+      <mark
+        key={idx}
+        style={{
+          background: 'rgba(255, 213, 79, 0.55)',
+          color: 'inherit',
+          borderRadius: '2px',
+          padding: '0 1px',
+        }}
+      >
+        {text.slice(idx, idx + query.length)}
+      </mark>
+    );
+    last = idx + query.length;
+    idx = lower.indexOf(queryLower, last);
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return <>{parts}</>;
 }
 
 const COLORS = {
@@ -36,7 +66,7 @@ const COLORS = {
   },
 };
 
-export function DiffHunk({ chunk, theme }: DiffHunkProps) {
+export function DiffHunk({ chunk, theme, searchQuery }: DiffHunkProps) {
   const c = COLORS[theme];
 
   return (
@@ -142,7 +172,7 @@ export function DiffHunk({ chunk, theme }: DiffHunkProps) {
                 overflow: 'hidden',
               }}
             >
-              {change.content.slice(1)}
+              {searchQuery ? highlightText(change.content.slice(1), searchQuery) : change.content.slice(1)}
             </span>
           </div>
         );

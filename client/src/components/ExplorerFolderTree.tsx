@@ -1,0 +1,206 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Folder, FolderOpen, FileText, FileCode, FileJson, ChevronRight, ChevronDown } from 'lucide-react';
+import type { DirectoryEntry } from '@remote-orchestrator/shared';
+import { api } from '../services/api.js';
+
+interface ExplorerFolderTreeProps {
+  rootPath: string;
+  onFileSelect: (path: string, ext: string) => void;
+  selectedFilePath: string | null;
+}
+
+interface TreeNode {
+  entries: DirectoryEntry[];
+  loading: boolean;
+}
+
+function FileIcon({ ext }: { ext: string }) {
+  const style = { width: 14, height: 14, flexShrink: 0 as const, color: 'var(--color-text-muted)' };
+  if (ext === '.ts' || ext === '.tsx' || ext === '.js' || ext === '.jsx') return <FileCode style={style} />;
+  if (ext === '.json') return <FileJson style={style} />;
+  return <FileText style={style} />;
+}
+
+export function ExplorerFolderTree({ rootPath, onFileSelect, selectedFilePath }: ExplorerFolderTreeProps) {
+  const [treeData, setTreeData] = useState<Map<string, TreeNode>>(new Map());
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [isRootLoading, setIsRootLoading] = useState(true);
+  const fetchCounterRef = useRef(0);
+
+  useEffect(() => {
+    if (!rootPath) return;
+    const id = ++fetchCounterRef.current;
+    setIsRootLoading(true);
+    setTreeData(new Map());
+    setExpandedPaths(new Set());
+
+    api.getDirectoryChildren(rootPath, true).then((result) => {
+      if (fetchCounterRef.current !== id) return;
+      setTreeData(new Map([[rootPath, { entries: result.entries, loading: false }]]));
+      setExpandedPaths(new Set([rootPath]));
+      setIsRootLoading(false);
+    }).catch(() => {
+      if (fetchCounterRef.current !== id) return;
+      setTreeData(new Map([[rootPath, { entries: [], loading: false }]]));
+      setIsRootLoading(false);
+    });
+  }, [rootPath]);
+
+  const toggleExpand = useCallback(async (dirPath: string) => {
+    if (expandedPaths.has(dirPath)) {
+      setExpandedPaths((prev) => {
+        const next = new Set(prev);
+        next.delete(dirPath);
+        return next;
+      });
+      return;
+    }
+
+    if (!treeData.has(dirPath)) {
+      setTreeData((prev) => new Map(prev).set(dirPath, { entries: [], loading: true }));
+      try {
+        const result = await api.getDirectoryChildren(dirPath, true);
+        setTreeData((prev) => new Map(prev).set(dirPath, { entries: result.entries, loading: false }));
+      } catch {
+        setTreeData((prev) => new Map(prev).set(dirPath, { entries: [], loading: false }));
+      }
+    }
+
+    setExpandedPaths((prev) => new Set(prev).add(dirPath));
+  }, [expandedPaths, treeData]);
+
+  // Flatten tree into renderable rows
+  const rows: { entry: DirectoryEntry; depth: number }[] = [];
+
+  function buildRows(parentPath: string, depth: number) {
+    const node = treeData.get(parentPath);
+    if (!node || node.loading) return;
+    for (const entry of node.entries) {
+      rows.push({ entry, depth });
+      if (!entry.isFile && expandedPaths.has(entry.path)) {
+        buildRows(entry.path, depth + 1);
+      }
+    }
+  }
+
+  if (!isRootLoading && rootPath) {
+    buildRows(rootPath, 0);
+  }
+
+  if (isRootLoading) {
+    return (
+      <div style={{ padding: '8px 4px' }}>
+        {[80, 60, 90, 50, 70, 65, 85, 45].map((w, i) => (
+          <div key={i} style={{
+            height: '22px',
+            margin: '2px 0',
+            background: 'var(--color-bg-elevated)',
+            borderRadius: 'var(--radius-sm)',
+            width: `${w}%`,
+            opacity: 0.5,
+          }} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '4px 0' }}>
+      {rows.length === 0 && (
+        <div style={{
+          padding: '16px 12px',
+          fontSize: 'var(--text-sm)',
+          color: 'var(--color-text-muted)',
+          fontStyle: 'italic',
+        }}>
+          Empty directory
+        </div>
+      )}
+      {rows.map(({ entry, depth }) => {
+        const isExpanded = expandedPaths.has(entry.path);
+        const isSelected = selectedFilePath === entry.path;
+        const isLoading = treeData.get(entry.path)?.loading;
+
+        return (
+          <div
+            key={entry.path}
+            onClick={() => {
+              if (entry.isFile) {
+                onFileSelect(entry.path, entry.ext);
+              } else {
+                toggleExpand(entry.path);
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '3px',
+              padding: '3px 8px',
+              paddingLeft: `${8 + depth * 16}px`,
+              cursor: 'pointer',
+              background: isSelected
+                ? 'var(--color-surface-bright, var(--color-bg-elevated))'
+                : 'transparent',
+              borderLeft: isSelected
+                ? '2px solid var(--color-accent)'
+                : '2px solid transparent',
+              color: isSelected ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              fontSize: 'var(--text-sm)',
+              fontFamily: 'var(--font-mono)',
+              transition: 'background var(--transition-fast)',
+              userSelect: 'none',
+            }}
+            onMouseEnter={(e) => {
+              if (!isSelected) e.currentTarget.style.background = 'var(--color-bg-elevated)';
+            }}
+            onMouseLeave={(e) => {
+              if (!isSelected) e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            {/* Expand/collapse arrow column (18px fixed) */}
+            <span style={{ width: 18, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              {!entry.isFile && entry.hasChildren && (
+                isLoading
+                  ? <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>…</span>
+                  : isExpanded
+                    ? <ChevronDown size={11} strokeWidth={2} style={{ color: 'var(--color-text-muted)' }} />
+                    : <ChevronRight size={11} strokeWidth={2} style={{ color: 'var(--color-text-muted)' }} />
+              )}
+            </span>
+
+            {/* Icon */}
+            {entry.isFile
+              ? <FileIcon ext={entry.ext} />
+              : isExpanded
+                ? <FolderOpen size={14} strokeWidth={1.75} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+                : <Folder size={14} strokeWidth={1.75} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+            }
+
+            {/* Name */}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+              {entry.name}
+            </span>
+
+            {/* File size badge */}
+            {entry.isFile && entry.size !== undefined && (
+              <span style={{
+                fontSize: 10,
+                color: 'var(--color-text-muted)',
+                flexShrink: 0,
+                marginLeft: 4,
+              }}>
+                {formatSize(entry.size)}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}

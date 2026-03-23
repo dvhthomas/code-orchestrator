@@ -9,9 +9,10 @@ interface DiffFileSectionProps {
   theme: 'dark' | 'light';
   defaultExpanded: boolean;
   collapseAllKey?: number;
+  searchQuery?: string;
 }
 
-export function DiffFileSection({ file, theme, defaultExpanded, collapseAllKey }: DiffFileSectionProps) {
+export function DiffFileSection({ file, theme, defaultExpanded, collapseAllKey, searchQuery }: DiffFileSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [showFull, setShowFull] = useState(false);
 
@@ -113,7 +114,7 @@ export function DiffFileSection({ file, theme, defaultExpanded, collapseAllKey }
                   }
                   if (linesBefore >= MAX_LINES_BEFORE_TRUNCATE) return null;
                 }
-                return <DiffHunk key={i} chunk={chunk} theme={theme} />;
+                return <DiffHunk key={i} chunk={chunk} theme={theme} searchQuery={searchQuery} />;
               })}
               {isTruncated && (
                 <div

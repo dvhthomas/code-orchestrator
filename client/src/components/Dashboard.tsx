@@ -64,6 +64,8 @@ function triggerRefit() {
 function FocusedDiffWrapper({
   sessionId,
   sessionStatus,
+  sessions,
+  onSelectSession,
   diffState,
   theme,
   onClose,
@@ -71,6 +73,8 @@ function FocusedDiffWrapper({
 }: {
   sessionId: string;
   sessionStatus: string;
+  sessions: SessionInfo[];
+  onSelectSession: (id: string) => void;
   diffState: DiffState;
   theme: 'dark' | 'light';
   onClose: () => void;
@@ -89,6 +93,9 @@ function FocusedDiffWrapper({
       isLoading={isLoading}
       error={error}
       isFullscreen={diffState.isFullscreen}
+      sessions={sessions}
+      currentSessionId={sessionId}
+      onSelectSession={onSelectSession}
       onClose={onClose}
       onToggleFullscreen={onToggleFullscreen}
       onRefresh={refresh}
@@ -249,7 +256,7 @@ export function Dashboard({
   }
 
   return (
-    <div style={{ position: 'relative', height: 'calc(100vh - var(--header-height))', overflow: 'hidden' }}>
+    <div className="dashboard-outer" style={{ position: 'relative', height: 'calc(100vh - var(--header-height))', overflow: 'hidden' }}>
       {/* Focus overlay */}
       {isFocused && focusedSession && (
         <div
@@ -460,9 +467,9 @@ export function Dashboard({
             </div>
 
             {/* Terminal + Diff area */}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
               {!(getDiffState(focusedSession.id).isOpen && getDiffState(focusedSession.id).isFullscreen) && (
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 'var(--space-2)' }}>
+                <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', padding: 'var(--space-2)' }}>
                   <TerminalPanel
                     session={focusedSession}
                     socket={socket}
@@ -476,16 +483,18 @@ export function Dashboard({
               {getDiffState(focusedSession.id).isOpen && (
                 <div
                   style={{
-                    maxHeight: '40%',
-                    minHeight: '200px',
+                    width: '40%',
+                    minWidth: '280px',
                     display: 'flex',
                     flexDirection: 'column',
-                    borderTop: '1px solid var(--color-border-base)',
+                    borderLeft: '1px solid var(--color-border-base)',
                   }}
                 >
                   <FocusedDiffWrapper
                     sessionId={focusedSession.id}
                     sessionStatus={focusedSession.status}
+                    sessions={sessions}
+                    onSelectSession={handleSwitchFocus}
                     diffState={getDiffState(focusedSession.id)}
                     theme={theme}
                     onClose={() => onCloseDiff(focusedSession.id)}
@@ -503,6 +512,7 @@ export function Dashboard({
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={groupSortableIds} strategy={verticalListSortingStrategy}>
           <div
+            className="dashboard-grid"
             style={{
               display: 'grid',
               gridTemplateColumns: `repeat(auto-fit, minmax(min(500px, 100%), 1fr))`,

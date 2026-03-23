@@ -90,9 +90,32 @@ export interface DirectoryEntry {
   name: string;
   path: string;
   hasChildren: boolean;
+  isFile: boolean;
+  ext: string;
+  size?: number;
 }
 
 export interface DirectoryChildrenResponse {
   entries: DirectoryEntry[];
   parentPath: string;
+}
+
+export interface FileContentResponse {
+  content: string;
+  encoding: 'utf8' | 'base64';
+  mimeType: string;
+  size: number;
+  truncated: boolean;
+}
+
+export interface FileSearchResult {
+  path: string;
+  name: string;
+  ext: string;
+  matchType: 'filename' | 'content';
+}
+
+export interface FileSearchResponse {
+  results: FileSearchResult[];
+  query: string;
 }

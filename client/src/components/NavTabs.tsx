@@ -1,6 +1,6 @@
-import { Terminal, GitBranch, FolderOpen, Bug } from 'lucide-react';
+import { Terminal, GitBranch, FolderOpen } from 'lucide-react';
 
-export type AppTab = 'sessions' | 'git-diff' | 'explorer' | 'debugger';
+export type AppTab = 'sessions' | 'git-diff' | 'explorer';
 
 interface TabConfig {
   id: AppTab;
@@ -12,8 +12,7 @@ interface TabConfig {
 const TABS: TabConfig[] = [
   { id: 'sessions',  label: 'Terminal Sessions', icon: Terminal },
   { id: 'git-diff',  label: 'Git Diff',          icon: GitBranch },
-  { id: 'explorer',  label: 'Explorer',           icon: FolderOpen, disabled: true },
-  { id: 'debugger',  label: 'Debugger',           icon: Bug,        disabled: true },
+  { id: 'explorer',  label: 'Explorer',           icon: FolderOpen },
 ];
 
 interface NavTabsProps {

@@ -1,4 +1,4 @@
-import { readdir } from 'fs/promises';
+import { readdir, stat } from 'fs/promises';
 import path from 'path';
 import os from 'os';
 
@@ -7,13 +7,18 @@ const EXCLUDED_DIRS = new Set([
   '.next', '.nuxt', '.cache', 'coverage', '.terraform',
 ]);
 
+const EXCLUDED_FILE_EXTENSIONS = new Set(['.map', '.lock', '.log']);
+
 export interface DirectoryEntry {
   name: string;
   path: string;
   hasChildren: boolean;
+  isFile: boolean;
+  ext: string;
+  size?: number;
 }
 
-export async function getDirectoryChildren(dirPath?: string): Promise<{
+export async function getDirectoryChildren(dirPath?: string, includeFiles = false): Promise<{
   entries: DirectoryEntry[];
   parentPath: string;
 }> {
@@ -23,27 +28,50 @@ export async function getDirectoryChildren(dirPath?: string): Promise<{
 
   try {
     const entries = await readdir(resolved, { withFileTypes: true });
-    const results: DirectoryEntry[] = [];
+    const dirs: DirectoryEntry[] = [];
+    const files: DirectoryEntry[] = [];
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      if (entry.name.startsWith('.')) continue;
-      if (EXCLUDED_DIRS.has(entry.name)) continue;
+      if (entry.name.startsWith('.') && !includeFiles) continue;
 
-      const fullPath = path.join(resolved, entry.name);
-      let hasChildren = false;
-      try {
-        const children = await readdir(fullPath, { withFileTypes: true });
-        hasChildren = children.some(c => c.isDirectory() && !c.name.startsWith('.') && !EXCLUDED_DIRS.has(c.name));
-      } catch { /* permission denied */ }
+      if (entry.isDirectory()) {
+        if (EXCLUDED_DIRS.has(entry.name)) continue;
+        if (entry.name.startsWith('.')) continue;
 
-      results.push({ name: entry.name, path: fullPath, hasChildren });
+        const fullPath = path.join(resolved, entry.name);
+        let hasChildren = false;
+        try {
+          const children = await readdir(fullPath, { withFileTypes: true });
+          hasChildren = children.some(c =>
+            !c.name.startsWith('.') && (
+              (c.isDirectory() && !EXCLUDED_DIRS.has(c.name)) ||
+              (includeFiles && !c.isDirectory())
+            )
+          );
+        } catch { /* permission denied */ }
+
+        dirs.push({ name: entry.name, path: fullPath, hasChildren, isFile: false, ext: '' });
+      } else if (includeFiles && !entry.isDirectory()) {
+        if (entry.name.startsWith('.') && entry.name !== '.env' && entry.name !== '.gitignore' && entry.name !== '.eslintrc' && entry.name !== '.prettierrc') continue;
+        const ext = path.extname(entry.name).toLowerCase();
+        if (EXCLUDED_FILE_EXTENSIONS.has(ext)) continue;
+
+        const fullPath = path.join(resolved, entry.name);
+        let size: number | undefined;
+        try {
+          const s = await stat(fullPath);
+          size = s.size;
+        } catch { /* permission denied */ }
+
+        files.push({ name: entry.name, path: fullPath, hasChildren: false, isFile: true, ext, size });
+      }
     }
 
-    return {
-      entries: results.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 50),
-      parentPath: resolved,
-    };
+    const sortedDirs = dirs.sort((a, b) => a.name.localeCompare(b.name));
+    const sortedFiles = files.sort((a, b) => a.name.localeCompare(b.name));
+    const results = [...sortedDirs, ...sortedFiles].slice(0, 200);
+
+    return { entries: results, parentPath: resolved };
   } catch {
     return { entries: [], parentPath: resolved };
   }

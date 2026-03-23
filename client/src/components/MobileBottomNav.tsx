@@ -1,4 +1,4 @@
-import { Terminal, GitBranch, Settings, Plus } from 'lucide-react';
+import { Terminal, GitBranch, FolderOpen, Plus } from 'lucide-react';
 import type { AppTab } from './NavTabs.js';
 
 interface MobileBottomNavProps {
@@ -16,7 +16,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'sessions',  label: 'Sessions',  icon: Terminal },
   { id: 'git-diff',  label: 'Git Diff',  icon: GitBranch },
-  { id: 'debugger',  label: 'Settings',  icon: Settings },
+  { id: 'explorer',  label: 'Explorer',  icon: FolderOpen },
 ];
 
 export function MobileBottomNav({ activeTab, onTabChange, onNewSession }: MobileBottomNavProps) {
@@ -111,7 +111,7 @@ export function MobileBottomNav({ activeTab, onTabChange, onNewSession }: Mobile
         return (
           <button
             key={item.id}
-            onClick={() => onTabChange('debugger')}
+            onClick={() => onTabChange(item.id)}
             style={{
               display: 'flex',
               flexDirection: 'column',

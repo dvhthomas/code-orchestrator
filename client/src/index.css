@@ -47,4 +47,43 @@ body {
   #root {
     padding-bottom: 64px;
   }
+
+  /* Sessions: make dashboard scrollable on mobile */
+  .dashboard-outer {
+    overflow-y: auto !important;
+  }
+  .dashboard-grid {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .session-group-card {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  .session-group-grid {
+    flex: none !important;
+    overflow: visible !important;
+    grid-auto-rows: auto !important;
+  }
+  /* Give each terminal a fixed height so xterm renders properly */
+  .terminal-panel {
+    min-height: 340px !important;
+    flex: none !important;
+  }
+
+  /* Search inputs: prevent iOS auto-zoom (font-size must be >= 16px) */
+  .diff-search-input {
+    font-size: 16px !important;
+    padding: 8px 12px !important;
+    min-height: 44px !important;
+  }
+
+  /* Session dropdown: larger touch target */
+  .diff-session-select {
+    font-size: 16px !important;
+    padding: 8px !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    min-height: 44px !important;
+  }
 }

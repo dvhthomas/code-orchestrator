@@ -51,6 +51,7 @@ export function SessionGroup({
   return (
     <div
       ref={setNodeRef}
+      className="session-group-card"
       style={{
         ...style,
         borderLeft: '3px solid var(--color-border-subtle)',
@@ -150,6 +151,7 @@ export function SessionGroup({
 
       <SortableContext items={sessionSortableIds} strategy={rectSortingStrategy}>
         <div
+          className="session-group-grid"
           style={{
             display: 'grid',
             gap: 'var(--space-2)',
