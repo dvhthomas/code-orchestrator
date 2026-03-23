@@ -14,6 +14,7 @@ const AGENT_PROMPT_PATTERNS: Record<string, RegExp[]> = {
     /Would you like to/i,
     /Esc to cancel/i,
     /Enter to confirm/i,
+    /\?\s*$/,
   ],
   gemini: [
     />\s*$/,
