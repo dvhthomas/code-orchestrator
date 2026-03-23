@@ -12,11 +12,14 @@ import type {
 import { PtyManager } from './PtyManager.js';
 import { StateDetector } from './StateDetector.js';
 import { SessionStore, type PersistedSession } from '../persistence/SessionStore.js';
+import { ConfigStore } from '../persistence/ConfigStore.js';
+import { AgentRegistry } from './AgentRegistry.js';
 
 interface ManagedSession {
   id: string;
   name: string;
   folderPath: string;
+  agentType: string;
   status: SessionStatus;
   createdAt: string;
   pty: IPty;
@@ -28,20 +31,31 @@ interface ManagedSession {
 export class SessionManager {
   private sessions = new Map<string, ManagedSession>();
   private ptyManager = new PtyManager();
+  private agentRegistry = new AgentRegistry();
   private store: SessionStore;
+  private configStore: ConfigStore;
   private io: Server<ClientToServerEvents, ServerToClientEvents> | null = null;
 
-  constructor(dataDir: string) {
+  constructor(dataDir: string, configStore: ConfigStore) {
     this.store = new SessionStore(path.join(dataDir, 'sessions.json'));
+    this.configStore = configStore;
   }
 
   setIo(io: Server<ClientToServerEvents, ServerToClientEvents>): void {
     this.io = io;
   }
 
-  async createSession(folderPath: string, name?: string): Promise<SessionInfo> {
+  async createSession(folderPath: string, name?: string, agentType?: string): Promise<SessionInfo> {
     // Validate folder exists
     await access(folderPath);
+
+    // Resolve agent type: explicit > config default > 'claude'
+    const config = await this.configStore.load();
+    const resolvedAgentType = agentType || config.defaultAgent || 'claude';
+
+    // Resolve the CLI command for this agent
+    const agentDef = this.agentRegistry.getById(resolvedAgentType, config.customAgents);
+    const command = agentDef?.command ?? resolvedAgentType;
 
     const id = uuidv4();
     const sessionName = name || path.basename(folderPath);
@@ -53,9 +67,9 @@ export class SessionManager {
         session.status = status;
         this.io?.to(id).emit('session:status', { sessionId: id, status });
       }
-    });
+    }, resolvedAgentType);
 
-    const ptyProcess = this.ptyManager.spawn(folderPath);
+    const ptyProcess = this.ptyManager.spawn(folderPath, command);
 
     ptyProcess.onData((data) => {
       // Buffer output for replay on reconnect
@@ -76,6 +90,7 @@ export class SessionManager {
       id,
       name: sessionName,
       folderPath,
+      agentType: resolvedAgentType,
       status: 'running',
       createdAt,
       pty: ptyProcess,
@@ -139,8 +154,8 @@ export class SessionManager {
     for (const p of persisted) {
       try {
         await access(p.folderPath);
-        await this.createSession(p.folderPath, p.name);
-        console.log(`Restored session: ${p.name} (${p.folderPath})`);
+        await this.createSession(p.folderPath, p.name, p.agentType);
+        console.log(`Restored session: ${p.name} (${p.folderPath}) [${p.agentType}]`);
       } catch {
         console.warn(`Skipping session ${p.name}: folder ${p.folderPath} not accessible`);
       }
@@ -154,6 +169,7 @@ export class SessionManager {
       folderPath: session.folderPath,
       status: session.status,
       createdAt: session.createdAt,
+      agentType: session.agentType,
     };
   }
 
@@ -163,6 +179,7 @@ export class SessionManager {
       name: s.name,
       folderPath: s.folderPath,
       createdAt: s.createdAt,
+      agentType: s.agentType,
     }));
     await this.store.save(data);
   }

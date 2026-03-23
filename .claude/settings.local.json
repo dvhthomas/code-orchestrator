@@ -67,7 +67,27 @@
       "Read(//usr/local/bin/**)",
       "Bash(echo \"exit: $?\")",
       "Bash(chmod:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(find /Users/macbookpro10/development/projects/remote-orchestrator/docs/solutions -type f -name *.md)",
+      "mcp__plugin_compound-engineering_context7__resolve-library-id",
+      "mcp__plugin_compound-engineering_context7__query-docs",
+      "WebSearch",
+      "WebFetch(domain:bundlephobia.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"feat\\(server\\): add git diff API endpoint:*)",
+      "Bash(npm run:*)",
+      "Bash(git commit -m \"feat\\(client\\): integrate diff panel into focus mode layout:*)",
+      "Bash(git commit -m \"feat\\(client\\): add large diff truncation and 20+ file warning:*)",
+      "Bash(git log:*)",
+      "Bash(git commit:*)",
+      "Bash(git -C /Users/macbookpro10/development/Rebrandly/rebrandly_api/api-product diff --stat)",
+      "Bash(git -C /Users/macbookpro10/development/Rebrandly/rebrandly_api/api-product diff --cached --stat)",
+      "Bash(git -C /Users/macbookpro10/development/Rebrandly/rebrandly_api/api-product status --short)",
+      "Bash(git:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

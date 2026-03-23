@@ -1,4 +1,4 @@
-import type { SessionInfo, CreateSessionRequest, PathCompletionResponse, DirectoryChildrenResponse, GitDiffResponse } from '@remote-orchestrator/shared';
+import type { SessionInfo, CreateSessionRequest, PathCompletionResponse, DirectoryChildrenResponse, GitDiffResponse, NgrokStatus, NgrokStartResponse, AppConfig, AgentDetectionResponse } from '@remote-orchestrator/shared';
 
 const API_BASE = '/api';
 
@@ -61,6 +61,52 @@ export const api = {
 
   getSessionDiff: async (sessionId: string): Promise<GitDiffResponse> => {
     const res = await fetch(`${API_BASE}/sessions/${sessionId}/diff`);
+    return res.json();
+  },
+
+  getNgrokStatus: async (): Promise<NgrokStatus> => {
+    const res = await fetch(`${API_BASE}/ngrok/status`);
+    return res.json();
+  },
+
+  startNgrok: async (): Promise<NgrokStartResponse> => {
+    const res = await fetch(`${API_BASE}/ngrok/start`, { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error || 'Failed to start ngrok');
+    }
+    return res.json();
+  },
+
+  stopNgrok: async (): Promise<void> => {
+    const res = await fetch(`${API_BASE}/ngrok/stop`, { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error || 'Failed to stop ngrok');
+    }
+  },
+
+  recheckNgrok: async (): Promise<NgrokStatus> => {
+    const res = await fetch(`${API_BASE}/ngrok/recheck`, { method: 'POST' });
+    return res.json();
+  },
+
+  getConfig: async (): Promise<AppConfig> => {
+    const res = await fetch(`${API_BASE}/config`);
+    return res.json();
+  },
+
+  updateConfig: async (data: Partial<AppConfig>): Promise<AppConfig> => {
+    const res = await fetch(`${API_BASE}/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  detectAgents: async (): Promise<AgentDetectionResponse> => {
+    const res = await fetch(`${API_BASE}/agents/detect`);
     return res.json();
   },
 };

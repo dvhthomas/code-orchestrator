@@ -15,7 +15,7 @@ interface SessionGroupProps {
   socket: TypedSocket;
   theme: 'dark' | 'light';
   onDeleteSession: (id: string) => void;
-  onCloneSession: (folderPath: string) => void;
+  onCloneSession: (folderPath: string, agentType?: string) => void;
   onFocusSession?: (id: string) => void;
   onToggleDiff?: (id: string) => void;
   focusedSessionId?: string | null;
@@ -78,14 +78,17 @@ export function SessionGroup({
             {...listeners}
             style={{
               cursor: 'grab',
-              fontSize: '14px',
               color: isDark ? '#565f89' : '#8b8fa3',
               flexShrink: 0,
               userSelect: 'none',
+              display: 'flex',
+              alignItems: 'center',
             }}
             title="Drag to reorder group"
           >
-            {'\u2807'}
+            <svg width="14" height="14" viewBox="0 0 12 12" fill="currentColor">
+              <polygon points="6,0 8,3 7,3 7,5 9,5 9,4 12,6 9,8 9,7 7,7 7,9 8,9 6,12 4,9 5,9 5,7 3,7 3,8 0,6 3,4 3,5 5,5 5,3 4,3" />
+            </svg>
           </span>
           <span
             style={{
@@ -133,7 +136,7 @@ export function SessionGroup({
           style={{
             display: 'grid',
             gap: '8px',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(600px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(600px, 100%), 1fr))',
             gridAutoRows: '1fr',
             flex: 1,
             minHeight: 0,

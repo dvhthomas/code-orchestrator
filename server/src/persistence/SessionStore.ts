@@ -6,6 +6,7 @@ export interface PersistedSession {
   name: string;
   folderPath: string;
   createdAt: string;
+  agentType: string;
 }
 
 export class SessionStore {
@@ -23,7 +24,12 @@ export class SessionStore {
   async load(): Promise<PersistedSession[]> {
     try {
       const data = await readFile(this.filePath, 'utf-8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      // Backfill agentType for sessions saved before multi-agent support
+      return parsed.map((s: PersistedSession) => ({
+        ...s,
+        agentType: s.agentType || 'claude',
+      }));
     } catch {
       return [];
     }

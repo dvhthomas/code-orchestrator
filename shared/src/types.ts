@@ -1,16 +1,45 @@
 export type SessionStatus = 'waiting' | 'running' | 'idle' | 'exited';
 
+export type BuiltinAgentId = 'claude' | 'gemini' | 'codex';
+export type AgentType = BuiltinAgentId | string;
+
+export interface AgentDefinition {
+  id: string;
+  name: string;
+  command: string;
+  builtin: boolean;
+  installCommand?: string;
+  installUrl?: string;
+}
+
+export interface AppConfig {
+  defaultAgent: AgentType;
+  customAgents: AgentDefinition[];
+}
+
+export interface AgentStatus {
+  agent: AgentDefinition;
+  installed: boolean;
+  resolvedPath?: string;
+}
+
+export interface AgentDetectionResponse {
+  agents: AgentStatus[];
+}
+
 export interface SessionInfo {
   id: string;
   name: string;
   folderPath: string;
   status: SessionStatus;
   createdAt: string;
+  agentType: AgentType;
 }
 
 export interface CreateSessionRequest {
   folderPath: string;
   name?: string;
+  agentType?: AgentType;
 }
 
 export interface CreateSessionResponse extends SessionInfo {}
@@ -33,6 +62,21 @@ export interface ServerToClientEvents {
   'session:exit': (payload: { sessionId: string; exitCode: number }) => void;
   'session:created': (session: SessionInfo) => void;
   'session:deleted': (payload: { sessionId: string }) => void;
+  'ngrok:status': (status: NgrokStatus) => void;
+}
+
+export type NgrokTunnelStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface NgrokStatus {
+  installed: boolean;
+  tunnelStatus: NgrokTunnelStatus;
+  publicUrl: string | null;
+  error: string | null;
+  platform: string;
+}
+
+export interface NgrokStartResponse {
+  publicUrl: string;
 }
 
 export interface GitDiffResponse {

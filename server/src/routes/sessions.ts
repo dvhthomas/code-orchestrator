@@ -35,7 +35,7 @@ export function createSessionRoutes(manager: SessionManager, orderStore: OrderSt
   });
 
   router.post('/', async (req, res) => {
-    const { folderPath, name } = req.body as CreateSessionRequest;
+    const { folderPath, name, agentType } = req.body as CreateSessionRequest;
 
     if (!folderPath) {
       res.status(400).json({ error: 'folderPath is required' });
@@ -43,7 +43,7 @@ export function createSessionRoutes(manager: SessionManager, orderStore: OrderSt
     }
 
     try {
-      const session = await manager.createSession(folderPath, name);
+      const session = await manager.createSession(folderPath, name, agentType);
       res.status(201).json(session);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create session';

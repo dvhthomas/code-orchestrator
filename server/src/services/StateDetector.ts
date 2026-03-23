@@ -2,15 +2,40 @@ import type { SessionStatus } from '@remote-orchestrator/shared';
 
 const STRIP_ANSI = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?(\x07|\x1b\\)/g;
 
-// Patterns that indicate Claude is waiting for user input
-const PROMPT_PATTERNS = [
-  />\s*$/,                           // Basic prompt ">"
-  /\(y\/n\)\s*$/i,                   // Yes/no prompt
-  /\[Y\/n\]\s*$/,                    // Default-yes prompt
-  /\[y\/N\]\s*$/,                    // Default-no prompt
-  /Press Enter to continue/i,        // Continue prompt
-  /Allow once/i,                     // Permission prompt
-  /Do you want to/i,                 // Permission prompt
+const AGENT_PROMPT_PATTERNS: Record<string, RegExp[]> = {
+  claude: [
+    />\s*$/,
+    /\(y\/n\)\s*$/i,
+    /\[Y\/n\]\s*$/,
+    /\[y\/N\]\s*$/,
+    /Press Enter to continue/i,
+    /Allow once/i,
+    /Do you want to/i,
+  ],
+  gemini: [
+    />\s*$/,
+    /\(y\/n\)\s*$/i,
+    /\[Y\/n\]\s*$/,
+    /\[y\/N\]\s*$/,
+    /Yes\s*\/\s*No/i,
+    /Confirm/i,
+  ],
+  codex: [
+    />\s*$/,
+    /\(y\/n\)\s*$/i,
+    /\[Y\/n\]\s*$/,
+    /\[y\/N\]\s*$/,
+    /approve/i,
+  ],
+};
+
+const DEFAULT_PROMPT_PATTERNS: RegExp[] = [
+  />\s*$/,
+  /\$\s*$/,
+  /#\s*$/,
+  /\(y\/n\)\s*$/i,
+  /\[Y\/n\]\s*$/,
+  /\[y\/N\]\s*$/,
 ];
 
 export class StateDetector {
@@ -19,10 +44,12 @@ export class StateDetector {
   private currentStatus: SessionStatus = 'running';
   private onStatusChange: (status: SessionStatus) => void;
   private idleDelayMs: number;
+  private promptPatterns: RegExp[];
 
-  constructor(onStatusChange: (status: SessionStatus) => void, idleDelayMs = 500) {
+  constructor(onStatusChange: (status: SessionStatus) => void, agentType: string = 'claude', idleDelayMs = 500) {
     this.onStatusChange = onStatusChange;
     this.idleDelayMs = idleDelayMs;
+    this.promptPatterns = AGENT_PROMPT_PATTERNS[agentType] ?? DEFAULT_PROMPT_PATTERNS;
   }
 
   feed(data: string): void {
@@ -49,7 +76,7 @@ export class StateDetector {
   private checkForPrompt(): void {
     const tail = this.buffer.slice(-300).trim();
 
-    for (const pattern of PROMPT_PATTERNS) {
+    for (const pattern of this.promptPatterns) {
       if (pattern.test(tail)) {
         this.updateStatus('waiting');
         return;

@@ -2,8 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from './hooks/useSocket.js';
 import { useSessions } from './hooks/useSessions.js';
 import { useSessionOrder } from './hooks/useSessionOrder.js';
+import { useNgrok } from './hooks/useNgrok.js';
+import { useConfig } from './hooks/useConfig.js';
 import { Dashboard } from './components/Dashboard.js';
 import { CreateSessionModal } from './components/CreateSessionModal.js';
+import { NgrokModal } from './components/NgrokModal.js';
+import { SettingsModal } from './components/SettingsModal.js';
 import { api } from './services/api.js';
 
 type Theme = 'dark' | 'light';
@@ -25,11 +29,22 @@ export default function App() {
   const [pickedFolder, setPickedFolder] = useState<string | null>(null);
   const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null);
   const [diffStates, setDiffStates] = useState<Map<string, DiffState>>(new Map());
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showNgrokModal, setShowNgrokModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const socket = useSocket();
   const { sessions, createSession, deleteSession } = useSessions(socket);
+  const ngrok = useNgrok(socket);
+  const { config, updateConfig } = useConfig();
   const { getOrderedSessions, reorder } = useSessionOrder();
 
   const isDark = theme === 'dark';
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   useEffect(() => {
     document.body.style.background = isDark ? '#1a1b26' : '#f5f5f5';
@@ -58,9 +73,29 @@ export default function App() {
     });
   }, []);
 
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      document.documentElement.requestFullscreen();
+    }
+    triggerRefit();
+  }, [triggerRefit]);
+
   // Escape key priority: diff fullscreen → diff close → exit focus
+  // F key: toggle browser fullscreen (when not in a terminal/input)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'f' || e.key === 'F') {
+        const el = document.activeElement;
+        const tag = el?.tagName;
+        const inTerminal = el?.closest('.xterm') != null;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !inTerminal) {
+          toggleFullscreen();
+          return;
+        }
+      }
+
       if (e.key !== 'Escape') return;
 
       if (focusedSessionId) {
@@ -80,7 +115,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusedSessionId, getDiffState, setDiffState, triggerRefit]);
+  }, [focusedSessionId, getDiffState, setDiffState, triggerRefit, toggleFullscreen]);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
@@ -98,13 +133,13 @@ export default function App() {
     }
   }, []);
 
-  const handleCreate = async (folderPath: string, name?: string) => {
-    await createSession(folderPath, name);
+  const handleCreate = async (folderPath: string, name?: string, agentType?: string) => {
+    await createSession(folderPath, name, agentType);
   };
 
   const handleClone = useCallback(
-    async (folderPath: string) => {
-      await createSession(folderPath);
+    async (folderPath: string, agentType?: string) => {
+      await createSession(folderPath, undefined, agentType);
     },
     [createSession],
   );
@@ -191,6 +226,64 @@ export default function App() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
+            onClick={() => setShowSettingsModal(true)}
+            style={{
+              background: 'none',
+              border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
+              borderRadius: '6px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: isDark ? '#a9b1d6' : '#565c73',
+            }}
+            title="Settings"
+          >
+            {'\u2699'}
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            style={{
+              background: 'none',
+              border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
+              borderRadius: '6px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: isDark ? '#a9b1d6' : '#565c73',
+            }}
+            title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          >
+            {isFullscreen ? '\u2716' : '\u26F6'}
+          </button>
+          <button
+            onClick={() => setShowNgrokModal(true)}
+            style={{
+              position: 'relative',
+              background: 'none',
+              border: `1px solid ${ngrok.status?.tunnelStatus === 'connected' ? '#9ece6a' : isDark ? '#3b4261' : '#c0c0c0'}`,
+              borderRadius: '6px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: ngrok.status?.tunnelStatus === 'connected' ? '#9ece6a' : isDark ? '#a9b1d6' : '#565c73',
+            }}
+            title={ngrok.status?.tunnelStatus === 'connected' ? `Remote: ${ngrok.status.publicUrl}` : 'Remote Access'}
+          >
+            {'\uD83C\uDF10'}
+            {ngrok.status?.tunnelStatus === 'connected' && (
+              <span style={{
+                position: 'absolute',
+                top: '-3px',
+                right: '-3px',
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: '#9ece6a',
+                border: `2px solid ${isDark ? '#16161e' : '#e8e8e8'}`,
+              }} />
+            )}
+          </button>
+          <button
             onClick={toggleTheme}
             style={{
               background: 'none',
@@ -249,6 +342,30 @@ export default function App() {
           onCreate={handleCreate}
           theme={theme}
           initialFolderPath={pickedFolder}
+          defaultAgentType={config?.defaultAgent}
+          agents={config ? [...[{ id: 'claude', name: 'Claude', command: 'claude', builtin: true }, { id: 'gemini', name: 'Gemini CLI', command: 'gemini', builtin: true }, { id: 'codex', name: 'Codex', command: 'codex', builtin: true }], ...config.customAgents] : []}
+        />
+      )}
+
+      {showSettingsModal && config && (
+        <SettingsModal
+          config={config}
+          onClose={() => setShowSettingsModal(false)}
+          onSave={updateConfig}
+          theme={theme}
+        />
+      )}
+
+      {showNgrokModal && (
+        <NgrokModal
+          onClose={() => setShowNgrokModal(false)}
+          theme={theme}
+          status={ngrok.status}
+          loading={ngrok.loading}
+          error={ngrok.error}
+          onStart={ngrok.startTunnel}
+          onStop={ngrok.stopTunnel}
+          onRecheck={ngrok.recheckInstallation}
         />
       )}
     </>

@@ -1,17 +1,21 @@
 import { useState } from 'react';
+import type { AgentDefinition } from '@remote-orchestrator/shared';
 import { FolderTree } from './FolderTree.js';
 import { api } from '../services/api.js';
 
 interface CreateSessionModalProps {
   onClose: () => void;
-  onCreate: (folderPath: string, name?: string) => Promise<void>;
+  onCreate: (folderPath: string, name?: string, agentType?: string) => Promise<void>;
   theme: 'dark' | 'light';
   initialFolderPath?: string | null;
+  defaultAgentType?: string;
+  agents?: AgentDefinition[];
 }
 
-export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath }: CreateSessionModalProps) {
+export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath, defaultAgentType = 'claude', agents = [] }: CreateSessionModalProps) {
   const [folderPath, setFolderPath] = useState(initialFolderPath || '');
   const [name, setName] = useState('');
+  const [agentType, setAgentType] = useState(defaultAgentType);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -28,7 +32,7 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
     setError('');
 
     try {
-      await onCreate(folderPath.trim(), name.trim() || undefined);
+      await onCreate(folderPath.trim(), name.trim() || undefined, agentType);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session');
@@ -171,6 +175,44 @@ export function CreateSessionModal({ onClose, onCreate, theme, initialFolderPath
               </div>
             )}
           </div>
+
+          {agents.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: '6px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: isDark ? '#a9b1d6' : '#565c73',
+                }}
+              >
+                Agent
+              </label>
+              <select
+                value={agentType}
+                onChange={(e) => setAgentType(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  fontSize: '14px',
+                  border: `1px solid ${isDark ? '#3b4261' : '#c0c0c0'}`,
+                  borderRadius: '6px',
+                  background: isDark ? '#1a1b26' : '#ffffff',
+                  color: isDark ? '#c0caf5' : '#343b58',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  cursor: 'pointer',
+                }}
+              >
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name}{!agent.builtin ? ' (custom)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div style={{ marginBottom: '20px' }}>
             <label

@@ -31,7 +31,7 @@ interface DashboardProps {
   theme: 'dark' | 'light';
   onDeleteSession: (id: string) => void;
   onCreateSession: () => void;
-  onCloneSession: (folderPath: string) => void;
+  onCloneSession: (folderPath: string, agentType?: string) => void;
   onReorder: (order: string[]) => void;
   focusedSessionId: string | null;
   onFocusSession: (id: string) => void;
@@ -261,7 +261,7 @@ export function Dashboard({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
-                onClick={() => onCloneSession(focusedSession.folderPath)}
+                onClick={() => onCloneSession(focusedSession.folderPath, focusedSession.agentType)}
                 style={{
                   padding: '4px 12px',
                   fontSize: '12px',
@@ -349,7 +349,7 @@ export function Dashboard({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: `repeat(${groupKeys.length}, 1fr)`,
+              gridTemplateColumns: `repeat(auto-fit, minmax(min(500px, 100%), 1fr))`,
               gap: '8px',
               padding: '8px',
               height: '100%',

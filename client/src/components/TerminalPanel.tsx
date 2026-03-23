@@ -96,14 +96,17 @@ export function TerminalPanel({ session, socket, theme, onDelete, onFocus, onTog
             {...dragListeners}
             style={{
               cursor: 'grab',
-              fontSize: '12px',
               color: isDark ? '#565f89' : '#8b8fa3',
               flexShrink: 0,
               userSelect: 'none',
+              display: 'flex',
+              alignItems: 'center',
             }}
             title="Drag to reorder"
           >
-            {'\u2807'}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+              <polygon points="6,0 8,3 7,3 7,5 9,5 9,4 12,6 9,8 9,7 7,7 7,9 8,9 6,12 4,9 5,9 5,7 3,7 3,8 0,6 3,4 3,5 5,5 5,3 4,3" />
+            </svg>
           </span>
           <span
             style={{
@@ -125,6 +128,20 @@ export function TerminalPanel({ session, socket, theme, onDelete, onFocus, onTog
             }}
           >
             {session.name}
+          </span>
+          <span
+            style={{
+              fontSize: '10px',
+              padding: '1px 6px',
+              borderRadius: '8px',
+              background: isDark ? '#2d2f42' : '#e4e6f0',
+              color: isDark ? '#7aa2f7' : '#3b5998',
+              fontWeight: 500,
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {session.agentType}
           </span>
           <span
             style={{

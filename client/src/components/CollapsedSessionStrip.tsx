@@ -71,6 +71,16 @@ function CollapsedBar({
       >
         {session.name}
       </span>
+      <span
+        style={{
+          fontSize: '9px',
+          color: isDark ? '#565f89' : '#8b8fa3',
+          flexShrink: 0,
+          fontFamily: 'Menlo, Monaco, monospace',
+        }}
+      >
+        {session.agentType.slice(0, 3)}
+      </span>
     </div>
   );
 }
