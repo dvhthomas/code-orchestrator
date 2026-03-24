@@ -1,10 +1,11 @@
-import { Terminal, GitBranch, FolderOpen, Plus } from 'lucide-react';
+import { Terminal, GitBranch, FolderOpen, Plus, Settings } from 'lucide-react';
 import type { AppTab } from './NavTabs.js';
 
 interface MobileBottomNavProps {
   activeTab: AppTab;
   onTabChange: (tab: AppTab) => void;
   onNewSession: () => void;
+  onSettings: () => void;
 }
 
 interface NavItem {
@@ -19,7 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'explorer',  label: 'Explorer',  icon: FolderOpen },
 ];
 
-export function MobileBottomNav({ activeTab, onTabChange, onNewSession }: MobileBottomNavProps) {
+export function MobileBottomNav({ activeTab, onTabChange, onNewSession, onSettings }: MobileBottomNavProps) {
   return (
     <nav
       style={{
@@ -104,7 +105,7 @@ export function MobileBottomNav({ activeTab, onTabChange, onNewSession }: Mobile
         <Plus size={24} strokeWidth={2} />
       </button>
 
-      {/* Right nav item */}
+      {/* Right nav items */}
       {NAV_ITEMS.slice(2).map((item) => {
         const isActive = activeTab === item.id;
         const Icon = item.icon;
@@ -136,6 +137,34 @@ export function MobileBottomNav({ activeTab, onTabChange, onNewSession }: Mobile
           </button>
         );
       })}
+
+      {/* Settings */}
+      <button
+        onClick={onSettings}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '3px',
+          width: '64px',
+          height: '100%',
+          border: 'none',
+          background: 'transparent',
+          color: 'var(--color-text-muted)',
+          cursor: 'pointer',
+          fontSize: 'var(--text-xs)',
+          fontWeight: 400,
+          fontFamily: 'var(--font-sans)',
+          transition: 'color var(--transition-fast)',
+          padding: 0,
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+      >
+        <Settings size={22} strokeWidth={1.5} />
+        Settings
+      </button>
     </nav>
   );
 }

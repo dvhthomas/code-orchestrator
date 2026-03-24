@@ -6,6 +6,7 @@ import { api } from '../services/api.js';
 interface ExplorerFolderTreeProps {
   rootPath: string;
   onFileSelect: (path: string, ext: string) => void;
+  onFileDoubleClick?: (path: string) => void;
   selectedFilePath: string | null;
 }
 
@@ -21,7 +22,7 @@ function FileIcon({ ext }: { ext: string }) {
   return <FileText style={style} />;
 }
 
-export function ExplorerFolderTree({ rootPath, onFileSelect, selectedFilePath }: ExplorerFolderTreeProps) {
+export function ExplorerFolderTree({ rootPath, onFileSelect, onFileDoubleClick, selectedFilePath }: ExplorerFolderTreeProps) {
   const [treeData, setTreeData] = useState<Map<string, TreeNode>>(new Map());
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [isRootLoading, setIsRootLoading] = useState(true);
@@ -129,6 +130,12 @@ export function ExplorerFolderTree({ rootPath, onFileSelect, selectedFilePath }:
                 onFileSelect(entry.path, entry.ext);
               } else {
                 toggleExpand(entry.path);
+              }
+            }}
+            onDoubleClick={(e) => {
+              if (entry.isFile) {
+                e.stopPropagation();
+                onFileDoubleClick?.(entry.path);
               }
             }}
             style={{

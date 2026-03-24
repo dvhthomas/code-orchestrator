@@ -86,4 +86,9 @@ body {
     width: 100% !important;
     min-height: 44px !important;
   }
+
+  /* Settings button moved to bottom nav on mobile */
+  .header-settings-btn {
+    display: none !important;
+  }
 }

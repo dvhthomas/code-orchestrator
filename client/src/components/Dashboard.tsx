@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import type { SessionInfo } from '@remote-orchestrator/shared';
 import type { Socket } from 'socket.io-client';
 import type { ClientToServerEvents, ServerToClientEvents } from '@remote-orchestrator/shared';
@@ -130,6 +130,33 @@ export function Dashboard({
   const groups = useMemo(() => groupSessionsByFolder(sessions), [sessions]);
   const groupKeys = useMemo(() => Array.from(groups.keys()), [groups]);
   const groupSortableIds = useMemo(() => groupKeys.map((k) => `group::${k}`), [groupKeys]);
+
+  const [diffPanelWidth, setDiffPanelWidth] = useState(40);
+  const [isDragging, setIsDragging] = useState(false);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMouseMove = (e: MouseEvent) => {
+      if (!splitContainerRef.current) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      const offsetFromRight = rect.right - e.clientX;
+      const newWidthPct = Math.min(Math.max((offsetFromRight / rect.width) * 100, 20), 70);
+      setDiffPanelWidth(newWidthPct);
+    };
+    const onMouseUp = () => setIsDragging(false);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isDragging]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -467,9 +494,30 @@ export function Dashboard({
             </div>
 
             {/* Terminal + Diff area */}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+            <div
+              ref={splitContainerRef}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'row',
+                overflow: 'hidden',
+                cursor: isDragging ? 'col-resize' : undefined,
+                userSelect: isDragging ? 'none' : undefined,
+              }}
+            >
               {!(getDiffState(focusedSession.id).isOpen && getDiffState(focusedSession.id).isFullscreen) && (
-                <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', padding: 'var(--space-2)' }}>
+                <div
+                  style={{
+                    width: getDiffState(focusedSession.id).isOpen ? `${100 - diffPanelWidth}%` : undefined,
+                    flex: getDiffState(focusedSession.id).isOpen ? undefined : 1,
+                    minHeight: 0,
+                    minWidth: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    padding: 'var(--space-2)',
+                  }}
+                >
                   <TerminalPanel
                     session={focusedSession}
                     socket={socket}
@@ -480,14 +528,28 @@ export function Dashboard({
                   />
                 </div>
               )}
+              {getDiffState(focusedSession.id).isOpen && !getDiffState(focusedSession.id).isFullscreen && (
+                <div
+                  onMouseDown={handleDividerMouseDown}
+                  style={{
+                    width: '4px',
+                    cursor: 'col-resize',
+                    flexShrink: 0,
+                    background: isDragging ? 'var(--color-accent)' : 'var(--color-border-base)',
+                    transition: isDragging ? 'none' : 'background 0.15s',
+                    userSelect: 'none',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-accent)'; }}
+                  onMouseLeave={(e) => { if (!isDragging) e.currentTarget.style.background = 'var(--color-border-base)'; }}
+                />
+              )}
               {getDiffState(focusedSession.id).isOpen && (
                 <div
                   style={{
-                    width: '40%',
-                    minWidth: '280px',
+                    width: `${diffPanelWidth}%`,
+                    minWidth: '200px',
                     display: 'flex',
                     flexDirection: 'column',
-                    borderLeft: '1px solid var(--color-border-base)',
                   }}
                 >
                   <FocusedDiffWrapper

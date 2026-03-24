@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { FolderOpen, FileText, File, FileCode, FileJson, RefreshCw, Copy, Check, Search } from 'lucide-react';
+import { FolderOpen, FileText, File, FileCode, FileJson, RefreshCw, Copy, Check, Search, Link } from 'lucide-react';
 import type { SessionInfo, FileContentResponse, FileSearchResult } from '@remote-orchestrator/shared';
 import { StatusDot } from './primitives/StatusDot.js';
 import { ExplorerFolderTree } from './ExplorerFolderTree.js';
+import { Tooltip } from './primitives/Tooltip.js';
 import { api } from '../services/api.js';
 
 const NARROW_BREAKPOINT = 520;
@@ -25,9 +26,10 @@ interface SearchResultsListProps {
   selectedFilePath: string | null;
   rootPath: string;
   onSelect: (filePath: string, ext: string) => void;
+  onDoubleClick?: (filePath: string) => void;
 }
 
-function SearchResultsList({ results, isSearching, selectedFilePath, rootPath, onSelect }: SearchResultsListProps) {
+function SearchResultsList({ results, isSearching, selectedFilePath, rootPath, onSelect, onDoubleClick }: SearchResultsListProps) {
   if (isSearching) {
     return (
       <div style={{ padding: '8px 4px' }}>
@@ -80,6 +82,7 @@ function SearchResultsList({ results, isSearching, selectedFilePath, rootPath, o
           <div
             key={result.path}
             onClick={() => onSelect(result.path, result.ext)}
+            onDoubleClick={() => onDoubleClick?.(result.path)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -155,7 +158,10 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FileSearchResult[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
   const fetchIdRef = useRef(0);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isNarrow, setIsNarrow] = useState(false);
   const [isTreeVisible, setIsTreeVisible] = useState(true);
@@ -232,13 +238,30 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
     }
   }, [isNarrow]);
 
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastVisible(false), 1800);
+  }, []);
+
   const handleCopy = useCallback(() => {
     if (!fileContent) return;
     navigator.clipboard.writeText(fileContent.content).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      showToast('Content copied');
     });
-  }, [fileContent]);
+  }, [fileContent, showToast]);
+
+  const handleFileDoubleClick = useCallback((filePath: string) => {
+    navigator.clipboard.writeText(filePath).then(() => showToast('File path copied'));
+  }, [showToast]);
+
+  const handleCopyFilePath = useCallback(() => {
+    if (!selectedFilePath) return;
+    navigator.clipboard.writeText(selectedFilePath).then(() => showToast('File path copied'));
+  }, [selectedFilePath, showToast]);
 
   const selectedSession = sessions.find(s => s.id === selectedSessionId);
   const isSearchActive = searchQuery.trim().length > 0;
@@ -321,9 +344,32 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
                 }}>
                   {formatSize(fileContent.size)}
                 </span>
+                <Tooltip content="Copy file content" position="bottom">
+                  <button
+                    onClick={handleCopy}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'inline-flex',
+                      borderRadius: 'var(--radius-sm)',
+                      color: copied ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                      transition: 'color var(--transition-fast)',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                    onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+                  >
+                    {copied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.75} />}
+                  </button>
+                </Tooltip>
+              </>
+            )}
+            {isNarrow && selectedFilePath && (
+              <Tooltip content="Copy file path" position="bottom">
                 <button
-                  onClick={handleCopy}
-                  title="Copy content"
+                  onClick={handleCopyFilePath}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -331,16 +377,16 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
                     padding: '2px',
                     display: 'inline-flex',
                     borderRadius: 'var(--radius-sm)',
-                    color: copied ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                    color: 'var(--color-text-muted)',
                     transition: 'color var(--transition-fast)',
                     flexShrink: 0,
                   }}
-                  onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = 'var(--color-text-primary)'; }}
-                  onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
                 >
-                  {copied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.75} />}
+                  <Link size={13} strokeWidth={1.75} />
                 </button>
-              </>
+              </Tooltip>
             )}
           </div>
 
@@ -577,12 +623,14 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
                     selectedFilePath={selectedFilePath}
                     rootPath={selectedSession.folderPath}
                     onSelect={handleFileSelect}
+                    onDoubleClick={handleFileDoubleClick}
                   />
                 ) : (
                   <ExplorerFolderTree
                     key={`${selectedSessionId}-${treeKey}`}
                     rootPath={selectedSession.folderPath}
                     onFileSelect={handleFileSelect}
+                    onFileDoubleClick={handleFileDoubleClick}
                     selectedFilePath={selectedFilePath}
                   />
                 )}
@@ -748,12 +796,14 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
                   selectedFilePath={selectedFilePath}
                   rootPath={selectedSession.folderPath}
                   onSelect={handleFileSelect}
+                  onDoubleClick={handleFileDoubleClick}
                 />
               ) : (
                 <ExplorerFolderTree
                   key={`${selectedSessionId}-${treeKey}`}
                   rootPath={selectedSession.folderPath}
                   onFileSelect={handleFileSelect}
+                  onFileDoubleClick={handleFileDoubleClick}
                   selectedFilePath={selectedFilePath}
                 />
               )}
@@ -763,6 +813,32 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
           {/* Right: File preview (flex: 1) */}
           {filePreviewPanel}
         </>
+      )}
+      {/* Toast */}
+      {toastVisible && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#d4f5e2',
+          border: '1px solid #48c774',
+          borderRadius: 'var(--radius-md)',
+          padding: '7px 14px',
+          fontSize: 'var(--text-sm)',
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--color-text-primary)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          whiteSpace: 'nowrap',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+        }}>
+          <Check size={13} strokeWidth={2.5} style={{ color: '#1a7a40', flexShrink: 0 }} />
+          <span style={{ color: '#1a7a40' }}>{toastMessage}</span>
+        </div>
       )}
     </div>
   );
