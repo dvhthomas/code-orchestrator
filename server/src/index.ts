@@ -9,13 +9,16 @@ import { SessionManager } from './services/SessionManager.js';
 import { OrderStore } from './persistence/OrderStore.js';
 import { ConfigStore } from './persistence/ConfigStore.js';
 import { AgentRegistry } from './services/AgentRegistry.js';
+import { AuthService } from './services/AuthService.js';
 import { createSessionRoutes } from './routes/sessions.js';
 import { createFilesystemRoutes } from './routes/filesystem.js';
 import { createGitRoutes } from './routes/git.js';
 import { createNgrokRoutes } from './routes/ngrok.js';
+import { createAuthRoutes } from './routes/auth.js';
 import { NgrokService } from './services/NgrokService.js';
 import { createConfigRoutes, createAgentRoutes } from './routes/config.js';
 import { setupSocketHandler } from './socket/handler.js';
+import { createAuthMiddleware } from './middleware/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(__dirname, '..', 'data');
@@ -41,9 +44,18 @@ sessionManager.setIo(io);
 // Order store
 const orderStore = new OrderStore(path.join(dataDir, 'order.json'));
 
+// Auth service
+const authService = new AuthService();
+authService.setIo(io);
+
+// Auth middleware — before routes
+app.use(createAuthMiddleware(authService));
+
 // Ngrok service
 const ngrokService = new NgrokService();
 ngrokService.setIo(io);
+ngrokService.getAuthRequired = () => authService.enabled;
+ngrokService.onDisconnect = () => authService.clearAuth();
 
 // Routes
 app.get('/api/health', (_req, res) => {
@@ -52,12 +64,13 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/sessions', createSessionRoutes(sessionManager, orderStore));
 app.use('/api/fs', createFilesystemRoutes());
 app.use('/api', createGitRoutes(sessionManager));
-app.use('/api/ngrok', createNgrokRoutes(ngrokService));
+app.use('/api/ngrok', createNgrokRoutes(ngrokService, authService));
+app.use('/api/auth', createAuthRoutes(authService));
 app.use('/api/config', createConfigRoutes(configStore));
 app.use('/api/agents', createAgentRoutes(agentRegistry));
 
 // Socket.io
-setupSocketHandler(io, sessionManager);
+setupSocketHandler(io, sessionManager, authService);
 
 // Start
 const PORT = 5400;

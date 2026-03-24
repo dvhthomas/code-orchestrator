@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import type { NgrokStatus } from '@remote-orchestrator/shared';
 import { Modal } from './primitives/index.js';
 import { Button } from './primitives/index.js';
@@ -8,7 +10,7 @@ interface NgrokModalProps {
   status: NgrokStatus | null;
   loading: boolean;
   error: string | null;
-  onStart: () => void;
+  onStart: (password: string) => void;
   onStop: () => void;
   onRecheck: () => void;
 }
@@ -22,6 +24,12 @@ export function NgrokModal({
   onStop,
   onRecheck,
 }: NgrokModalProps) {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => {
       const el = document.createElement('textarea');
@@ -54,6 +62,21 @@ export function NgrokModal({
     };
   };
 
+  const handleStart = () => {
+    setPasswordError(null);
+    if (password.length < 4) {
+      setPasswordError('Password must be at least 4 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setPasswordError('Passwords do not match.');
+      return;
+    }
+    onStart(password);
+    setPassword('');
+    setConfirmPassword('');
+  };
+
   const isConnected = status?.tunnelStatus === 'connected';
   const isConnecting = status?.tunnelStatus === 'connecting' || loading;
   const isError = status?.tunnelStatus === 'error';
@@ -66,7 +89,7 @@ export function NgrokModal({
           Stop Tunnel
         </Button>
       ) : (
-        <Button variant="primary" disabled={isConnecting} onClick={onStart}>
+        <Button variant="primary" disabled={isConnecting} onClick={handleStart}>
           {isConnecting ? 'Connecting…' : isError ? 'Retry' : 'Start Tunnel'}
         </Button>
       )}
@@ -148,14 +171,14 @@ export function NgrokModal({
             style={{
               marginTop: 'var(--space-3)',
               padding: '10px 12px',
-              background: 'var(--color-warning-bg)',
-              border: '1px solid var(--color-warning-border)',
+              background: 'rgba(158,206,106,0.08)',
+              border: '1px solid var(--color-success)',
               borderRadius: 'var(--radius-md)',
               fontSize: 'var(--text-sm)',
-              color: 'var(--color-warning)',
+              color: 'var(--color-success)',
             }}
           >
-            ⚠ Anyone with this URL can control your Claude sessions.
+            This tunnel is password protected. Share the URL and password only with trusted collaborators.
           </div>
 
           <p style={{ margin: '12px 0 0', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
@@ -167,12 +190,53 @@ export function NgrokModal({
       {/* Installed — disconnected */}
       {status?.installed && !isConnected && !isConnecting && (
         <div style={{ marginBottom: 'var(--space-5)' }}>
-          <p style={{ margin: '0 0 4px', fontSize: 'var(--text-md)', color: 'var(--color-text-primary)' }}>
+          <p style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-md)', color: 'var(--color-text-primary)' }}>
             Start an ngrok tunnel to access this dashboard remotely.
           </p>
-          <p style={{ margin: 0, fontSize: 'var(--text-base)', color: 'var(--color-text-muted)' }}>
-            Your computer will stay awake while the tunnel is active.
-          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div>
+              <label style={labelStyle} htmlFor="ngrok-password">Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="ngrok-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setPasswordError(null); }}
+                  placeholder="Set a password for remote access"
+                  style={{ ...inputStyle, paddingRight: '36px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  style={eyeButtonStyle}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle} htmlFor="ngrok-confirm-password">Confirm Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="ngrok-confirm-password"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(null); }}
+                  placeholder="Confirm password"
+                  style={{ ...inputStyle, paddingRight: '36px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  style={eyeButtonStyle}
+                >
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            {passwordError && <ErrorBox message={passwordError} />}
+          </div>
         </div>
       )}
     </Modal>
@@ -312,4 +376,37 @@ const actionLinkStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
   flexShrink: 0,
   transition: 'background var(--transition-fast)',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '8px 12px',
+  background: 'var(--color-bg-input)',
+  border: '1px solid var(--color-border-base)',
+  borderRadius: 'var(--radius-md)',
+  fontSize: 'var(--text-base)',
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  marginBottom: '4px',
+  fontSize: 'var(--text-sm)',
+  fontWeight: 500,
+  color: 'var(--color-text-secondary)',
+};
+
+const eyeButtonStyle: React.CSSProperties = {
+  position: 'absolute',
+  right: '8px',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '2px',
+  color: 'var(--color-text-muted)',
+  display: 'flex',
 };

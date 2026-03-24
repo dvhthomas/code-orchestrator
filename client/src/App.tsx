@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from './context/ThemeContext.js';
 import { Styleguide } from './components/styleguide/Styleguide.js';
-import { useSocket } from './hooks/useSocket.js';
+import { useSocket, reconnectSocket } from './hooks/useSocket.js';
 import { useSessions } from './hooks/useSessions.js';
 import { useSessionOrder } from './hooks/useSessionOrder.js';
 import { useNgrok } from './hooks/useNgrok.js';
@@ -13,12 +13,13 @@ import { CreateSessionModal } from './components/CreateSessionModal.js';
 import { CloneSessionModal } from './components/CloneSessionModal.js';
 import { NgrokModal } from './components/NgrokModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
+import { PasswordGate } from './components/PasswordGate.js';
 import { GitDiffPanel } from './components/GitDiffPanel.js';
 import { ExplorerPanel } from './components/ExplorerPanel.js';
 import { NavTabs } from './components/NavTabs.js';
 import type { AppTab } from './components/NavTabs.js';
 import { MobileBottomNav } from './components/MobileBottomNav.js';
-import { api } from './services/api.js';
+import { api, setToken } from './services/api.js';
 
 interface DiffState {
   isOpen: boolean;
@@ -26,6 +27,73 @@ interface DiffState {
 }
 
 export default function App() {
+  const socket = useSocket();
+  const [authRequired, setAuthRequired] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Check auth status once on mount
+  useEffect(() => {
+    api.getAuthStatus().then((status) => {
+      setAuthRequired(status.required);
+      setAuthenticated(status.authenticated ?? !status.required);
+      setAuthChecked(true);
+    }).catch(() => {
+      // If auth check fails, assume no auth required so local users aren't locked out
+      setAuthRequired(false);
+      setAuthenticated(true);
+      setAuthChecked(true);
+    });
+  }, []);
+
+  // Listen for auth:required socket event
+  useEffect(() => {
+    const handleAuthRequired = (payload: { required: boolean }) => {
+      setAuthRequired(payload.required);
+      if (!payload.required) {
+        // Tunnel stopped — clear auth
+        setAuthenticated(true);
+        setToken(null);
+      }
+      // When required becomes true, do NOT force authenticated=false.
+      // Local user is already authenticated=true; remote user is already false.
+    };
+    socket.on('auth:required', handleAuthRequired);
+    return () => { socket.off('auth:required', handleAuthRequired); };
+  }, [socket]);
+
+  // Listen for auth:authenticated (dispatched by startNgrok after storing token)
+  useEffect(() => {
+    const handler = () => {
+      setAuthenticated(true);
+      reconnectSocket();
+    };
+    window.addEventListener('auth:authenticated', handler);
+    return () => window.removeEventListener('auth:authenticated', handler);
+  }, []);
+
+  // Listen for 401 from API calls
+  useEffect(() => {
+    const handler = () => setAuthenticated(false);
+    window.addEventListener('auth:unauthorized', handler);
+    return () => window.removeEventListener('auth:unauthorized', handler);
+  }, []);
+
+  if (!authChecked) return null;
+
+  if (authRequired && !authenticated) {
+    return (
+      <PasswordGate onAuthenticated={() => {
+        setAuthenticated(true);
+        reconnectSocket();
+      }} />
+    );
+  }
+
+  return <AppInner />;
+}
+
+function AppInner() {
   const { theme, isDark, toggle: toggleTheme } = useTheme();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [pickedFolder, setPickedFolder] = useState<string | null>(null);
@@ -234,6 +302,7 @@ export default function App() {
           justifyContent: 'space-between',
           height: 'var(--header-height)',
           padding: '0 var(--space-4)',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
           background: 'var(--color-bg-header)',
           borderBottom: 'none',
         }}

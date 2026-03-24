@@ -25,6 +25,9 @@ export class NgrokService {
   private readonly MAX_POLL_ATTEMPTS = 20;
   private readonly sleepPrevention: SleepPreventionService;
 
+  public getAuthRequired: () => boolean = () => false;
+  public onDisconnect: (() => void) | null = null;
+
   constructor() {
     this.ngrokPath = findNgrok();
     this.sleepPrevention = new SleepPreventionService();
@@ -45,6 +48,7 @@ export class NgrokService {
       publicUrl: this.publicUrl,
       error: this.error,
       platform: process.platform,
+      authRequired: this.getAuthRequired(),
     };
   }
 
@@ -100,6 +104,7 @@ export class NgrokService {
         this.stopPolling();
         this.sleepPrevention.stop();
         this.broadcastStatus();
+        this.onDisconnect?.();
       }
       this.process = null;
     });
@@ -148,6 +153,7 @@ export class NgrokService {
     this.tunnelStatus = 'disconnected';
     this.publicUrl = null;
     this.error = null;
+    this.onDisconnect?.();
     this.broadcastStatus();
   }
 

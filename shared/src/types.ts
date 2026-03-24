@@ -63,6 +63,7 @@ export interface ServerToClientEvents {
   'session:created': (session: SessionInfo) => void;
   'session:deleted': (payload: { sessionId: string }) => void;
   'ngrok:status': (status: NgrokStatus) => void;
+  'auth:required': (payload: { required: boolean }) => void;
 }
 
 export type NgrokTunnelStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -73,10 +74,21 @@ export interface NgrokStatus {
   publicUrl: string | null;
   error: string | null;
   platform: string;
+  authRequired: boolean;
 }
 
 export interface NgrokStartResponse {
   publicUrl: string;
+  token: string;
+}
+
+export interface AuthStatus {
+  required: boolean;
+  authenticated?: boolean;
+}
+
+export interface AuthLoginResponse {
+  token: string;
 }
 
 export interface GitDiffResponse {

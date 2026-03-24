@@ -1,15 +1,43 @@
-import type { SessionInfo, CreateSessionRequest, PathCompletionResponse, DirectoryChildrenResponse, FileContentResponse, FileSearchResponse, GitDiffResponse, NgrokStatus, NgrokStartResponse, AppConfig, AgentDetectionResponse } from '@remote-orchestrator/shared';
+import type { SessionInfo, CreateSessionRequest, PathCompletionResponse, DirectoryChildrenResponse, FileContentResponse, FileSearchResponse, GitDiffResponse, NgrokStatus, NgrokStartResponse, AppConfig, AgentDetectionResponse, AuthStatus, AuthLoginResponse } from '@remote-orchestrator/shared';
 
 const API_BASE = '/api';
+const TOKEN_KEY = 'orchestrator_auth_token';
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string | null): void {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
+async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const token = getToken();
+  const headers = new Headers(init?.headers);
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const res = await fetch(url, { ...init, headers });
+  if (res.status === 401) {
+    setToken(null);
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    throw new Error('Authentication required');
+  }
+  return res;
+}
 
 export const api = {
   getSessions: async (): Promise<SessionInfo[]> => {
-    const res = await fetch(`${API_BASE}/sessions`);
+    const res = await authFetch(`${API_BASE}/sessions`);
     return res.json();
   },
 
   createSession: async (data: CreateSessionRequest): Promise<SessionInfo> => {
-    const res = await fetch(`${API_BASE}/sessions`, {
+    const res = await authFetch(`${API_BASE}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -22,17 +50,17 @@ export const api = {
   },
 
   deleteSession: async (id: string): Promise<void> => {
-    await fetch(`${API_BASE}/sessions/${id}`, { method: 'DELETE' });
+    await authFetch(`${API_BASE}/sessions/${id}`, { method: 'DELETE' });
   },
 
   getPathCompletions: async (path: string): Promise<string[]> => {
-    const res = await fetch(`${API_BASE}/fs/autocomplete?path=${encodeURIComponent(path)}`);
+    const res = await authFetch(`${API_BASE}/fs/autocomplete?path=${encodeURIComponent(path)}`);
     const data: PathCompletionResponse = await res.json();
     return data.completions;
   },
 
   pickFolder: async (): Promise<string | null> => {
-    const res = await fetch(`${API_BASE}/fs/pick-folder`, { method: 'POST' });
+    const res = await authFetch(`${API_BASE}/fs/pick-folder`, { method: 'POST' });
     const data = await res.json();
     return data.path;
   },
@@ -41,18 +69,18 @@ export const api = {
     const params = new URLSearchParams();
     if (dirPath) params.set('path', dirPath);
     if (includeFiles) params.set('includeFiles', 'true');
-    const res = await fetch(`${API_BASE}/fs/children?${params}`);
+    const res = await authFetch(`${API_BASE}/fs/children?${params}`);
     return res.json();
   },
 
   searchFiles: async (rootPath: string, query: string): Promise<FileSearchResponse> => {
     const params = new URLSearchParams({ path: rootPath, q: query });
-    const res = await fetch(`${API_BASE}/fs/search?${params}`);
+    const res = await authFetch(`${API_BASE}/fs/search?${params}`);
     return res.json();
   },
 
   getFileContent: async (filePath: string): Promise<FileContentResponse> => {
-    const res = await fetch(`${API_BASE}/fs/file?path=${encodeURIComponent(filePath)}`);
+    const res = await authFetch(`${API_BASE}/fs/file?path=${encodeURIComponent(filePath)}`);
     if (!res.ok) {
       const err = await res.json() as { error: string };
       throw new Error(err.error);
@@ -61,13 +89,13 @@ export const api = {
   },
 
   getSessionOrder: async (): Promise<string[]> => {
-    const res = await fetch(`${API_BASE}/sessions/order`);
+    const res = await authFetch(`${API_BASE}/sessions/order`);
     const data = await res.json();
     return data.order;
   },
 
   saveSessionOrder: async (order: string[]): Promise<void> => {
-    await fetch(`${API_BASE}/sessions/order`, {
+    await authFetch(`${API_BASE}/sessions/order`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order }),
@@ -75,7 +103,7 @@ export const api = {
   },
 
   getSessionDiff: async (sessionId: string): Promise<GitDiffResponse> => {
-    const res = await fetch(`${API_BASE}/sessions/${sessionId}/diff`);
+    const res = await authFetch(`${API_BASE}/sessions/${sessionId}/diff`);
     return res.json();
   },
 
@@ -84,21 +112,24 @@ export const api = {
     return res.json();
   },
 
-  startNgrok: async (port: number = 5173): Promise<NgrokStartResponse> => {
-    const res = await fetch(`${API_BASE}/ngrok/start`, {
+  startNgrok: async (port: number = 5173, password?: string): Promise<NgrokStartResponse> => {
+    const res = await authFetch(`${API_BASE}/ngrok/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ port }),
+      body: JSON.stringify({ port, password }),
     });
     if (!res.ok) {
       const err = await res.json() as { error?: string };
       throw new Error(err.error || 'Failed to start ngrok');
     }
-    return res.json();
+    const data: NgrokStartResponse = await res.json();
+    setToken(data.token);
+    window.dispatchEvent(new CustomEvent('auth:authenticated'));
+    return data;
   },
 
   stopNgrok: async (): Promise<void> => {
-    const res = await fetch(`${API_BASE}/ngrok/stop`, { method: 'POST' });
+    const res = await authFetch(`${API_BASE}/ngrok/stop`, { method: 'POST' });
     if (!res.ok) {
       const err = await res.json() as { error?: string };
       throw new Error(err.error || 'Failed to stop ngrok');
@@ -106,17 +137,17 @@ export const api = {
   },
 
   recheckNgrok: async (): Promise<NgrokStatus> => {
-    const res = await fetch(`${API_BASE}/ngrok/recheck`, { method: 'POST' });
+    const res = await authFetch(`${API_BASE}/ngrok/recheck`, { method: 'POST' });
     return res.json();
   },
 
   getConfig: async (): Promise<AppConfig> => {
-    const res = await fetch(`${API_BASE}/config`);
+    const res = await authFetch(`${API_BASE}/config`);
     return res.json();
   },
 
   updateConfig: async (data: Partial<AppConfig>): Promise<AppConfig> => {
-    const res = await fetch(`${API_BASE}/config`, {
+    const res = await authFetch(`${API_BASE}/config`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -125,7 +156,27 @@ export const api = {
   },
 
   detectAgents: async (): Promise<AgentDetectionResponse> => {
-    const res = await fetch(`${API_BASE}/agents/detect`);
+    const res = await authFetch(`${API_BASE}/agents/detect`);
+    return res.json();
+  },
+
+  getAuthStatus: async (): Promise<AuthStatus> => {
+    const res = await fetch(`${API_BASE}/auth/status`, {
+      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+    });
+    return res.json();
+  },
+
+  login: async (password: string): Promise<AuthLoginResponse> => {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error || 'Login failed');
+    }
     return res.json();
   },
 };

@@ -1,13 +1,28 @@
 import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@remote-orchestrator/shared';
 import type { SessionManager } from '../services/SessionManager.js';
+import type { AuthService } from '../services/AuthService.js';
 
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 export function setupSocketHandler(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
   manager: SessionManager,
+  authService: AuthService,
 ): void {
+  io.use((socket, next) => {
+    if (!authService.enabled) {
+      next();
+      return;
+    }
+    const token = socket.handshake.auth?.token as string | undefined;
+    if (token && authService.validateToken(token)) {
+      next();
+    } else {
+      next(new Error('Authentication required'));
+    }
+  });
+
   io.on('connection', (socket: TypedSocket) => {
     console.log(`Client connected: ${socket.id}`);
 

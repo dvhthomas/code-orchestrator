@@ -224,7 +224,7 @@ export function Dashboard({
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          height: 'calc(100vh - var(--header-height))',
+          height: 'calc(100vh - var(--header-height) - var(--nav-tabs-height))',
           gap: 'var(--space-4)',
           color: 'var(--color-text-muted)',
         }}
@@ -283,7 +283,7 @@ export function Dashboard({
   }
 
   return (
-    <div className="dashboard-outer" style={{ position: 'relative', height: 'calc(100vh - var(--header-height))', overflow: 'hidden' }}>
+    <div className="dashboard-outer" style={{ position: 'relative', height: 'calc(100vh - var(--header-height) - var(--nav-tabs-height))', overflow: 'hidden' }}>
       {/* Focus overlay */}
       {isFocused && focusedSession && (
         <div

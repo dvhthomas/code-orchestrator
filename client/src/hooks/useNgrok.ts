@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { NgrokStatus } from '@remote-orchestrator/shared';
 import type { Socket } from 'socket.io-client';
 import type { ClientToServerEvents, ServerToClientEvents } from '@remote-orchestrator/shared';
-import { api } from '../services/api.js';
+import { api, setToken } from '../services/api.js';
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -21,11 +21,11 @@ export function useNgrok(socket: TypedSocket) {
     return () => { socket.off('ngrok:status', handleStatus); };
   }, [socket]);
 
-  const startTunnel = useCallback(async () => {
+  const startTunnel = useCallback(async (password: string) => {
     setLoading(true);
     setError(null);
     try {
-      await api.startNgrok();
+      await api.startNgrok(5173, password);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start tunnel';
       setError(message);
@@ -39,6 +39,7 @@ export function useNgrok(socket: TypedSocket) {
     setError(null);
     try {
       await api.stopNgrok();
+      setToken(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to stop tunnel';
       setError(message);

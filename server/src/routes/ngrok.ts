@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import type { NgrokService } from '../services/NgrokService.js';
+import type { AuthService } from '../services/AuthService.js';
 
-export function createNgrokRoutes(ngrokService: NgrokService): Router {
+export function createNgrokRoutes(ngrokService: NgrokService, authService: AuthService): Router {
   const router = Router();
 
   router.get('/status', (_req, res) => {
-    res.json(ngrokService.getStatus());
+    res.json({ ...ngrokService.getStatus(), authRequired: authService.enabled });
   });
 
   router.post('/start', async (req, res) => {
@@ -13,10 +14,19 @@ export function createNgrokRoutes(ngrokService: NgrokService): Router {
       res.status(400).json({ error: 'ngrok is not installed' });
       return;
     }
+
+    const { password } = req.body ?? {};
+    if (!password || typeof password !== 'string' || password.trim().length < 4) {
+      res.status(400).json({ error: 'A password of at least 4 characters is required to start the tunnel' });
+      return;
+    }
+
     try {
       const port = typeof req.body?.port === 'number' ? req.body.port : 5173;
       const publicUrl = await ngrokService.start(port);
-      res.json({ publicUrl });
+      authService.setPassword(password);
+      const token = authService.generateToken();
+      res.json({ publicUrl, token });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start ngrok';
       res.status(500).json({ error: message });
@@ -35,7 +45,7 @@ export function createNgrokRoutes(ngrokService: NgrokService): Router {
 
   router.post('/recheck', (_req, res) => {
     ngrokService.recheckInstallation();
-    res.json(ngrokService.getStatus());
+    res.json({ ...ngrokService.getStatus(), authRequired: authService.enabled });
   });
 
   return router;
