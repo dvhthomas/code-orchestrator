@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import type { NgrokStatus } from '@remote-orchestrator/shared';
 import { Modal } from './primitives/index.js';
 import { Button } from './primitives/index.js';
@@ -165,6 +166,25 @@ export function NgrokModal({
             >
               Open ↗
             </a>
+          </div>
+
+          <div
+            style={{
+              marginTop: 'var(--space-4)',
+              display: 'flex',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                background: '#fff',
+                padding: '12px',
+                borderRadius: 'var(--radius-md)',
+                display: 'inline-flex',
+              }}
+            >
+              <QRCodeSVG value={status.publicUrl} size={176} />
+            </div>
           </div>
 
           <div
@@ -384,7 +404,7 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--color-bg-input)',
   border: '1px solid var(--color-border-base)',
   borderRadius: 'var(--radius-md)',
-  fontSize: 'var(--text-base)',
+  fontSize: '16px',
   color: 'var(--color-text-primary)',
   outline: 'none',
   boxSizing: 'border-box',

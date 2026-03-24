@@ -91,4 +91,9 @@ body {
   .header-settings-btn {
     display: none !important;
   }
+
+  /* Fullscreen API not supported on iOS — hide the button on mobile */
+  .header-fullscreen-btn {
+    display: none !important;
+  }
 }

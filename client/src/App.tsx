@@ -331,10 +331,12 @@ function AppInner() {
             </HeaderButton>
           </span>
 
-          {/* Fullscreen */}
-          <HeaderButton onClick={toggleFullscreen} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
-            {isFullscreen ? '\u2716' : '\u26F6'}
-          </HeaderButton>
+          {/* Fullscreen — hidden on mobile (Fullscreen API unsupported on iOS) */}
+          <span className="header-fullscreen-btn">
+            <HeaderButton onClick={toggleFullscreen} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+              {isFullscreen ? '\u2716' : '\u26F6'}
+            </HeaderButton>
+          </span>
 
           {/* Remote access */}
           <HeaderButton

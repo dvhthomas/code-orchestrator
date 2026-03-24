@@ -22,7 +22,13 @@ export function PasswordGate({ onAuthenticated }: PasswordGateProps) {
       const { token } = await api.login(password);
       setToken(token);
       reconnectSocket();
-      onAuthenticated();
+      // On mobile, reload so iOS recalculates safe-area-inset-top for the header
+      // (viewport meta now prevents zoom from persisting across the reload)
+      if (window.innerWidth < 768) {
+        window.location.reload();
+      } else {
+        onAuthenticated();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -102,7 +108,7 @@ export function PasswordGate({ onAuthenticated }: PasswordGateProps) {
                   background: 'var(--color-bg-input)',
                   border: '1px solid var(--color-border-base)',
                   borderRadius: 'var(--radius-md)',
-                  fontSize: 'var(--text-base)',
+                  fontSize: '16px',
                   color: 'var(--color-text-primary)',
                   outline: 'none',
                   boxSizing: 'border-box',
