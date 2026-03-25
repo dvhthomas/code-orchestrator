@@ -36,23 +36,19 @@ export async function getDirectoryChildren(dirPath?: string, includeFiles = fals
 
       if (entry.isDirectory()) {
         if (EXCLUDED_DIRS.has(entry.name)) continue;
-        if (entry.name.startsWith('.')) continue;
 
         const fullPath = path.join(resolved, entry.name);
         let hasChildren = false;
         try {
           const children = await readdir(fullPath, { withFileTypes: true });
           hasChildren = children.some(c =>
-            !c.name.startsWith('.') && (
-              (c.isDirectory() && !EXCLUDED_DIRS.has(c.name)) ||
-              (includeFiles && !c.isDirectory())
-            )
+            (c.isDirectory() && !EXCLUDED_DIRS.has(c.name)) ||
+            (includeFiles && !c.isDirectory())
           );
         } catch { /* permission denied */ }
 
         dirs.push({ name: entry.name, path: fullPath, hasChildren, isFile: false, ext: '' });
       } else if (includeFiles && !entry.isDirectory()) {
-        if (entry.name.startsWith('.') && entry.name !== '.env' && entry.name !== '.gitignore' && entry.name !== '.eslintrc' && entry.name !== '.prettierrc') continue;
         const ext = path.extname(entry.name).toLowerCase();
         if (EXCLUDED_FILE_EXTENSIONS.has(ext)) continue;
 
