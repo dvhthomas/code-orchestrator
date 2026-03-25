@@ -62,6 +62,9 @@ export function GitDiffPanel({
   const [showFullKey, setShowFullKey] = useState<string | null>(null);
   const [collapseAllKey, setCollapseAllKey] = useState(0);
   const [collapsedSections, setCollapsedSections] = useState<Set<SectionKey>>(new Set());
+  const [untrackedContent, setUntrackedContent] = useState<Map<string, string | 'loading' | 'error'>>(new Map());
+
+  const folderPath = sessions.find(s => s.id === currentSessionId)?.folderPath ?? '';
 
   function toggleSection(key: SectionKey) {
     setCollapsedSections(prev => {
@@ -144,6 +147,26 @@ export function GitDiffPanel({
 
   const selectedEntry: AnyEntry | null = allEntries.find(e => e.key === selectedKey) ?? null;
 
+  // Fetch untracked file content when selected
+  useEffect(() => {
+    if (!selectedEntry || selectedEntry.category !== 'untracked') return;
+    const { filePath } = selectedEntry;
+    if (untrackedContent.has(filePath)) return;
+    if (!folderPath) return;
+
+    setUntrackedContent(prev => new Map(prev).set(filePath, 'loading'));
+    const absPath = `${folderPath}/${filePath}`;
+    fetch(`/api/filesystem/file?path=${encodeURIComponent(absPath)}`)
+      .then(res => res.json())
+      .then((data: { content?: string; error?: string }) => {
+        setUntrackedContent(prev => new Map(prev).set(filePath, data.content ?? 'error'));
+      })
+      .catch(() => {
+        setUntrackedContent(prev => new Map(prev).set(filePath, 'error'));
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEntry, folderPath]);
+
   const headerBtnStyle = {
     background: 'none',
     border: 'none',
@@ -166,15 +189,74 @@ export function GitDiffPanel({
   // Right-panel file content renderer (wide layout)
   const renderFileContent = (entry: AnyEntry) => {
     if (entry.category === 'untracked') {
+      const contentVal = untrackedContent.get(entry.filePath);
       return (
-        <div style={{ padding: '16px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: categoryColor.untracked, textTransform: 'uppercase', letterSpacing: '0.05em' }}>untracked</span>
-            <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 700 }}>??</span>
+        <>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              background: 'var(--color-bg-elevated)',
+              borderBottom: '1px solid var(--color-border-base)',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: '11px', fontWeight: 600, color: categoryColor.untracked, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>untracked</span>
+            <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 700, flexShrink: 0 }}>??</span>
+            <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+              {entry.filePath}
+            </span>
           </div>
-          <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)', marginBottom: '8px' }}>{entry.filePath}</div>
-          <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Untracked file — not yet staged</div>
-        </div>
+          <div style={{ overflow: 'auto', flex: 1 }}>
+            {contentVal === 'loading' || contentVal === undefined ? (
+              <div style={{ padding: '12px 16px', fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Loading…</div>
+            ) : contentVal === 'error' ? (
+              <div style={{ padding: '12px 16px', fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Binary or unreadable file</div>
+            ) : contentVal === '' ? (
+              <div style={{ padding: '12px 16px', fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>(empty file)</div>
+            ) : (
+              <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
+                <tbody>
+                  {contentVal.split('\n').map((line, i) => (
+                    <tr key={i} style={{ background: theme === 'dark' ? 'rgba(165,213,112,0.10)' : 'rgba(165,213,112,0.12)' }}>
+                      <td
+                        style={{
+                          width: '48px',
+                          minWidth: '48px',
+                          padding: '0 8px',
+                          textAlign: 'right',
+                          fontSize: '11px',
+                          fontFamily: 'var(--font-mono)',
+                          color: 'var(--color-text-muted)',
+                          userSelect: 'none',
+                          verticalAlign: 'top',
+                          lineHeight: '20px',
+                        }}
+                      >
+                        {i + 1}
+                      </td>
+                      <td
+                        style={{
+                          padding: '0 8px',
+                          fontSize: '12px',
+                          fontFamily: 'var(--font-mono)',
+                          color: 'var(--color-text-primary)',
+                          whiteSpace: 'pre',
+                          lineHeight: '20px',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {line}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
       );
     }
     const { file } = entry;
