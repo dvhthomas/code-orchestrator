@@ -4,7 +4,7 @@ import type { Socket } from 'socket.io-client';
 import type { ClientToServerEvents, ServerToClientEvents } from '@remote-orchestrator/shared';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Maximize2, GitCompare, X, GripVertical, RotateCcw } from 'lucide-react';
+import { Maximize2, Minimize2, GitCompare, X, Move, RotateCcw } from 'lucide-react';
 import { useTerminal } from '../hooks/useTerminal.js';
 import { StatusDot } from './primitives/index.js';
 import { Badge } from './primitives/index.js';
@@ -20,6 +20,7 @@ interface TerminalPanelProps {
   onDelete: (id: string) => void;
   onRestart?: (id: string) => void;
   onFocus?: (id: string) => void;
+  onUnfocus?: () => void;
   onToggleDiff?: (id: string) => void;
   isDiffOpen?: boolean;
 }
@@ -40,7 +41,7 @@ const QUICK_ACTIONS = [
   { label: 'Tab', data: '\t', title: 'Tab' },
 ];
 
-export function TerminalPanel({ session, socket, theme, onDelete, onRestart, onFocus, onToggleDiff, isDiffOpen }: TerminalPanelProps) {
+export function TerminalPanel({ session, socket, theme, onDelete, onRestart, onFocus, onUnfocus, onToggleDiff, isDiffOpen }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   useTerminal(containerRef, { sessionId: session.id, socket, theme });
 
@@ -129,7 +130,7 @@ export function TerminalPanel({ session, socket, theme, onDelete, onRestart, onF
                 alignItems: 'center',
               }}
             >
-              <GripVertical size={14} strokeWidth={1.75} />
+              <Move size={14} strokeWidth={1.75} />
             </span>
           </Tooltip>
 
@@ -207,6 +208,20 @@ export function TerminalPanel({ session, socket, theme, onDelete, onRestart, onF
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
                 <Maximize2 size={14} strokeWidth={1.75} />
+              </button>
+            </Tooltip>
+          )}
+
+          {onUnfocus && (
+            <Tooltip content="Close focus" position="top">
+              <button
+                onClick={onUnfocus}
+                style={iconBtnStyle}
+                aria-label="Close focus"
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-surface)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <Minimize2 size={14} strokeWidth={1.75} />
               </button>
             </Tooltip>
           )}

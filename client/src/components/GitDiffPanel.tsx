@@ -155,7 +155,7 @@ export function GitDiffPanel({
     if (!folderPath) return;
 
     setUntrackedContent(prev => new Map(prev).set(filePath, 'loading'));
-    const absPath = `${folderPath}/${filePath}`;
+    const absPath = `${folderPath.replace(/\/$/, '')}/${filePath}`;
     fetch(`/api/filesystem/file?path=${encodeURIComponent(absPath)}`)
       .then(res => res.json())
       .then((data: { content?: string; error?: string }) => {

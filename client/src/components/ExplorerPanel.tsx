@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { FolderOpen, FileText, File, FileCode, FileJson, RefreshCw, Copy, Check, Search, Link } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { FolderOpen, FileText, File, FileCode, FileJson, RefreshCw, Copy, Check, Search, Link, BookOpen, Code } from 'lucide-react';
 import type { SessionInfo, FileContentResponse, FileSearchResult } from '@remote-orchestrator/shared';
 import { ExplorerFolderTree } from './ExplorerFolderTree.js';
 import { SessionSidebar } from './SessionSidebar.js';
@@ -11,6 +12,7 @@ const NARROW_BREAKPOINT = 520;
 interface ExplorerPanelProps {
   sessions: SessionInfo[];
   theme: 'dark' | 'light';
+  onSelectSession?: (id: string) => void;
 }
 
 function FileIcon({ ext }: { ext: string }) {
@@ -147,7 +149,7 @@ function SearchResultsList({ results, isSearching, selectedFilePath, rootPath, o
   );
 }
 
-export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
+export function ExplorerPanel({ sessions, onSelectSession }: ExplorerPanelProps) {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [treeKey, setTreeKey] = useState(0);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
@@ -165,6 +167,7 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isNarrow, setIsNarrow] = useState(false);
   const [isTreeVisible, setIsTreeVisible] = useState(true);
+  const [mdPreview, setMdPreview] = useState(false);
 
   // Detect container width to switch between wide and narrow layouts
   useEffect(() => {
@@ -217,6 +220,7 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
     setFileError(null);
     setSearchQuery('');
     setSearchResults(null);
+    onSelectSession?.(id);
   }, []);
 
   const handleFileSelect = useCallback(async (filePath: string, _ext: string) => {
@@ -225,6 +229,7 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
     setFileContent(null);
     setFileError(null);
     setFileLoading(true);
+    setMdPreview(false);
     if (isNarrow) setIsTreeVisible(false);
     try {
       const content = await api.getFileContent(filePath);
@@ -265,6 +270,7 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
 
   const selectedSession = sessions.find(s => s.id === selectedSessionId);
   const isSearchActive = searchQuery.trim().length > 0;
+  const isMd = selectedFilePath?.toLowerCase().endsWith('.md') ?? false;
 
   if (sessions.length === 0) {
     return (
@@ -364,6 +370,28 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
                     {copied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.75} />}
                   </button>
                 </Tooltip>
+                {isMd && (
+                  <Tooltip content={mdPreview ? 'View raw' : 'Preview markdown'} position="bottom">
+                    <button
+                      onClick={() => setMdPreview(p => !p)}
+                      style={{
+                        background: mdPreview ? 'var(--color-accent-subtle)' : 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        display: 'inline-flex',
+                        borderRadius: 'var(--radius-sm)',
+                        color: mdPreview ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                        transition: 'color var(--transition-fast)',
+                        flexShrink: 0,
+                      }}
+                      onMouseEnter={(e) => { if (!mdPreview) e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                      onMouseLeave={(e) => { if (!mdPreview) e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+                    >
+                      {mdPreview ? <Code size={13} strokeWidth={1.75} /> : <BookOpen size={13} strokeWidth={1.75} />}
+                    </button>
+                  </Tooltip>
+                )}
               </>
             )}
             {isNarrow && selectedFilePath && (
@@ -453,18 +481,30 @@ export function ExplorerPanel({ sessions }: ExplorerPanelProps) {
                     Showing first 512 KB — file truncated
                   </div>
                 )}
-                <pre style={{
-                  margin: 0,
-                  padding: '16px',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 'var(--text-sm)',
-                  lineHeight: 1.6,
-                  color: 'var(--color-text-primary)',
-                  whiteSpace: 'pre',
-                  overflowX: 'auto',
-                }}>
-                  {fileContent.content}
-                </pre>
+                {isMd && mdPreview ? (
+                  <div style={{
+                    padding: '16px 20px',
+                    fontSize: 'var(--text-sm)',
+                    lineHeight: 1.7,
+                    color: 'var(--color-text-primary)',
+                    maxWidth: '80ch',
+                  }} className="md-preview">
+                    <ReactMarkdown>{fileContent.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <pre style={{
+                    margin: 0,
+                    padding: '16px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--text-sm)',
+                    lineHeight: 1.6,
+                    color: 'var(--color-text-primary)',
+                    whiteSpace: 'pre',
+                    overflowX: 'auto',
+                  }}>
+                    {fileContent.content}
+                  </pre>
+                )}
               </>
             )}
           </div>

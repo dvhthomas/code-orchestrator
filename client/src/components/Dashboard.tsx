@@ -501,6 +501,7 @@ export function Dashboard({
                       theme={theme}
                       onDelete={onDeleteSession}
                       onRestart={onRestartSession}
+                      onUnfocus={handleUnfocus}
                       onToggleDiff={onToggleDiff}
                       isDiffOpen={getDiffState(focusedSession.id).isOpen}
                     />

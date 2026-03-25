@@ -46,14 +46,14 @@ export function createFilesystemRoutes(): Router {
       return;
     }
 
-    // Security: reject relative paths or traversal attempts
-    const resolved = path.resolve(rawPath);
-    if (resolved !== rawPath) {
+    // Security: reject relative paths; use resolve() to normalize // and ../ safely
+    if (!path.isAbsolute(rawPath)) {
       res.status(400).json({ error: 'invalid path' });
       return;
     }
+    const resolved = path.resolve(rawPath);
 
-    const ext = path.extname(rawPath).toLowerCase();
+    const ext = path.extname(resolved).toLowerCase();
 
     if (BINARY_EXTENSIONS.has(ext)) {
       res.status(400).json({ error: 'binary', mimeType: `application/octet-stream` });

@@ -5,7 +5,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@remote-orchest
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, GripVertical } from 'lucide-react';
+import { Plus, Move } from 'lucide-react';
 import { TerminalPanel } from './TerminalPanel.js';
 import { Tooltip } from './primitives/index.js';
 import { ErrorBoundary } from './ErrorBoundary.js';
@@ -91,7 +91,7 @@ export function SessionGroup({
                 alignItems: 'center',
               }}
             >
-              <GripVertical size={14} strokeWidth={1.75} />
+              <Move size={14} strokeWidth={1.75} />
             </span>
           </Tooltip>
           <span

@@ -475,7 +475,7 @@ function AppInner() {
       )}
       {activeTab === 'explorer' && (
         <ErrorBoundary variant="tab" label="Explorer">
-          <ExplorerPanel sessions={orderedSessions} theme={theme} />
+          <ExplorerPanel sessions={orderedSessions} theme={theme} onSelectSession={handleFocus} />
         </ErrorBoundary>
       )}
 
