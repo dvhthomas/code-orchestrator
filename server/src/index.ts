@@ -57,6 +57,18 @@ ngrokService.setIo(io);
 ngrokService.getAuthRequired = () => authService.enabled;
 ngrokService.onDisconnect = () => authService.clearAuth();
 
+// Temporary screenshot-save endpoint (dev only)
+import fs from 'fs';
+const screenshotsDir = path.resolve(__dirname, '..', '..', 'docs', 'screenshots');
+if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
+app.post('/api/screenshot', (req: express.Request, res: express.Response) => {
+  const { name, data } = req.body as { name: string; data: string };
+  const b64 = data.replace(/^data:image\/\w+;base64,/, '');
+  fs.writeFileSync(path.join(screenshotsDir, name), Buffer.from(b64, 'base64'));
+  console.log(`[screenshot] saved ${name}`);
+  res.json({ ok: true });
+});
+
 // Routes
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
@@ -74,6 +86,18 @@ setupSocketHandler(io, sessionManager, authService);
 
 // Start
 const PORT = 5400;
+
+let listenRetries = 0;
+httpServer.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE' && listenRetries < 5) {
+    listenRetries++;
+    console.log(`Port ${PORT} in use, retrying in 500ms… (${listenRetries}/5)`);
+    setTimeout(() => httpServer.listen(PORT), 500);
+  } else {
+    console.error('Server error:', err);
+    process.exit(1);
+  }
+});
 
 async function start() {
   await sessionManager.restoreSessions();

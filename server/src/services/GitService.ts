@@ -35,32 +35,9 @@ export class GitService {
     }
   }
 
-  private async findDefaultBranch(folderPath: string): Promise<string | null> {
-    // Try origin/HEAD first
-    try {
-      const ref = (await execGit(['rev-parse', '--abbrev-ref', 'origin/HEAD'], folderPath)).trim();
-      if (ref && ref !== 'origin/HEAD') return ref;
-    } catch { /* ignore */ }
-
-    // Fallback: try common default branch names
-    for (const branch of ['origin/main', 'origin/master', 'origin/develop']) {
-      try {
-        await execGit(['rev-parse', '--verify', branch], folderPath);
-        return branch;
-      } catch { /* ignore */ }
-    }
-    return null;
-  }
-
   private async getBranchDiff(folderPath: string): Promise<string> {
     try {
-      const defaultBranch = await this.findDefaultBranch(folderPath);
-      if (!defaultBranch) return '';
-
-      const mergeBase = (await execGit(['merge-base', 'HEAD', defaultBranch], folderPath)).trim();
-      if (!mergeBase) return '';
-
-      return await execGit(['diff', `${mergeBase}...HEAD`], folderPath);
+      return await execGit(['diff', 'HEAD'], folderPath);
     } catch {
       return '';
     }

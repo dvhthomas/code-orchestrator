@@ -92,7 +92,7 @@ export function GitDiffPanel({
     const untracked = diff?.untracked ?? [];
     let adds = 0;
     let dels = 0;
-    for (const f of [...staged, ...unstaged, ...branch]) {
+    for (const f of [...staged, ...unstaged]) {
       adds += f.additions;
       dels += f.deletions;
     }
@@ -101,7 +101,7 @@ export function GitDiffPanel({
       unstagedFiles: unstaged,
       branchFiles: branch,
       untrackedFiles: untracked,
-      totalFiles: staged.length + unstaged.length + branch.length + untracked.length,
+      totalFiles: staged.length + unstaged.length + untracked.length,
       totalAdditions: adds,
       totalDeletions: dels,
     };
@@ -130,9 +130,6 @@ export function GitDiffPanel({
     filteredStaged.forEach((file) =>
       entries.push({ key: `staged:${file.to ?? file.from ?? ''}`, category: 'staged', file }),
     );
-    filteredBranch.forEach((file) =>
-      entries.push({ key: `branch:${file.to ?? file.from ?? ''}`, category: 'branch', file }),
-    );
     filteredUntracked.forEach((filePath) =>
       entries.push({ key: `untracked:${filePath}`, category: 'untracked', filePath }),
     );
@@ -156,7 +153,7 @@ export function GitDiffPanel({
 
     setUntrackedContent(prev => new Map(prev).set(filePath, 'loading'));
     const absPath = `${folderPath.replace(/\/$/, '')}/${filePath}`;
-    fetch(`/api/filesystem/file?path=${encodeURIComponent(absPath)}`)
+    fetch(`/api/fs/file?path=${encodeURIComponent(absPath)}`)
       .then(res => res.json())
       .then((data: { content?: string; error?: string }) => {
         setUntrackedContent(prev => new Map(prev).set(filePath, data.content ?? 'error'));
@@ -166,6 +163,15 @@ export function GitDiffPanel({
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEntry, folderPath]);
+
+  async function handleTrackFile(filePath: string) {
+    await fetch(`/api/sessions/${currentSessionId}/git-add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filePath }),
+    });
+    onRefresh();
+  }
 
   const headerBtnStyle = {
     background: 'none',
@@ -502,19 +508,11 @@ export function GitDiffPanel({
                 ))}
               </div>
             )}
-            {!error && filteredBranch.length > 0 && (
-              <div>
-                {sectionHeader('branch', 'Branch Changes', filteredBranch.length, filteredUnstaged.length > 0 || filteredStaged.length > 0)}
-                {!collapsedSections.has('branch') && filteredBranch.map((file, i) => (
-                  <DiffFileSection key={`branch-${i}`} file={file} theme={theme} defaultExpanded={defaultExpanded} collapseAllKey={collapseAllKey} searchQuery={searchLower || undefined} />
-                ))}
-              </div>
-            )}
             {!error && filteredUntracked.length > 0 && (
               <div>
                 {sectionHeader('untracked', 'Untracked Files', filteredUntracked.length, filteredUnstaged.length > 0 || filteredStaged.length > 0 || filteredBranch.length > 0)}
                 {!collapsedSections.has('untracked') && filteredUntracked.map((filePath, i) => (
-                  <UntrackedFileRow key={`untracked-${i}`} filePath={filePath} />
+                  <UntrackedFileRow key={`untracked-${i}`} filePath={filePath} onTrack={() => handleTrackFile(filePath)} />
                 ))}
               </div>
             )}
@@ -577,16 +575,6 @@ export function GitDiffPanel({
                   })}
                 </div>
               )}
-              {filteredBranch.length > 0 && (
-                <div>
-                  <SidebarSectionHeader label="Branch" count={filteredBranch.length} isCollapsed={collapsedSections.has('branch')} onToggle={() => toggleSection('branch')} topPad={filteredUnstaged.length > 0 || filteredStaged.length > 0} />
-                  {!collapsedSections.has('branch') && filteredBranch.map((file) => {
-                    const key = `branch:${file.to ?? file.from ?? ''}`;
-                    const fileName = file.to === '/dev/null' ? file.from : file.to;
-                    return <FileRow key={key} fileName={fileName ?? 'unknown'} isNew={!!file.new} isDeleted={!!file.deleted} additions={file.additions} deletions={file.deletions} isActive={selectedKey === key} onClick={() => setUserSelectedKey(key)} />;
-                  })}
-                </div>
-              )}
               {filteredUntracked.length > 0 && (
                 <div>
                   <SidebarSectionHeader label="Untracked" count={filteredUntracked.length} isCollapsed={collapsedSections.has('untracked')} onToggle={() => toggleSection('untracked')} topPad={filteredUnstaged.length > 0 || filteredStaged.length > 0 || filteredBranch.length > 0} />
@@ -620,6 +608,13 @@ export function GitDiffPanel({
                         <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: selectedKey === key ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
                           {shortName}
                         </span>
+                        <button
+                          title="Track file (git add)"
+                          onClick={(e) => { e.stopPropagation(); handleTrackFile(filePath); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-success)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+                        >+</button>
                       </button>
                     );
                   })}
@@ -654,7 +649,7 @@ export function GitDiffPanel({
   );
 }
 
-function UntrackedFileRow({ filePath }: { filePath: string }) {
+function UntrackedFileRow({ filePath, onTrack }: { filePath: string; onTrack: () => void }) {
   const shortName = filePath.split('/').pop() ?? filePath;
   return (
     <div
@@ -670,7 +665,14 @@ function UntrackedFileRow({ filePath }: { filePath: string }) {
       }}
     >
       <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 700, flexShrink: 0 }}>??</span>
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortName}</span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{shortName}</span>
+      <button
+        title="Track file (git add)"
+        onClick={onTrack}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-success)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+      >+</button>
     </div>
   );
 }
