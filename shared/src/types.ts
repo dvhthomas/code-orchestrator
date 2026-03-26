@@ -64,6 +64,22 @@ export interface ServerToClientEvents {
   'session:deleted': (payload: { sessionId: string }) => void;
   'ngrok:status': (status: NgrokStatus) => void;
   'auth:required': (payload: { required: boolean }) => void;
+  'update:available': (status: UpdateStatus) => void;
+  'update:applying': () => void;
+}
+
+export interface UpdateStatus {
+  currentVersion: string;
+  latestVersion: string | null;
+  hasUpdate: boolean;
+  changelog: string;
+  releaseUrl: string;
+}
+
+export interface UpdateApplyResponse {
+  success: boolean;
+  error?: string;
+  depsChanged: boolean;
 }
 
 export type NgrokTunnelStatus = 'disconnected' | 'connecting' | 'connected' | 'error';

@@ -5,6 +5,7 @@ import { useSocket, useSocketStatus, reconnectSocket } from './hooks/useSocket.j
 import { useSessions } from './hooks/useSessions.js';
 import { useSessionOrder } from './hooks/useSessionOrder.js';
 import { useNgrok } from './hooks/useNgrok.js';
+import { useUpdate } from './hooks/useUpdate.js';
 import { useConfig } from './hooks/useConfig.js';
 import { useGitDiff } from './hooks/useGitDiff.js';
 import type { SessionInfo } from '@remote-orchestrator/shared';
@@ -12,6 +13,7 @@ import { Dashboard } from './components/Dashboard.js';
 import { CreateSessionModal } from './components/CreateSessionModal.js';
 import { CloneSessionModal } from './components/CloneSessionModal.js';
 import { NgrokModal } from './components/NgrokModal.js';
+import { UpdateModal } from './components/UpdateModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { PasswordGate } from './components/PasswordGate.js';
 import { GitDiffPanel } from './components/GitDiffPanel.js';
@@ -117,6 +119,8 @@ function AppInner() {
   const socketConnected = useSocketStatus();
   const { sessions, createSession, deleteSession } = useSessions(socket);
   const ngrok = useNgrok(socket);
+  const { status: updateStatus } = useUpdate(socket);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const { config, updateConfig } = useConfig();
   const { getOrderedSessions, reorder } = useSessionOrder();
 
@@ -372,6 +376,27 @@ function AppInner() {
             )}
           </HeaderButton>
 
+          {/* Update available */}
+          {updateStatus?.hasUpdate && (
+            <HeaderButton
+              onClick={() => setShowUpdateModal(true)}
+              title={`Update available: v${updateStatus.latestVersion}`}
+              style={{ position: 'relative', borderColor: 'var(--color-success)', color: 'var(--color-success)' }}
+            >
+              {'\u2B06'}
+              <span style={{
+                position: 'absolute',
+                top: '-3px',
+                right: '-3px',
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: 'var(--color-success)',
+                border: '2px solid var(--color-bg-header)',
+              }} />
+            </HeaderButton>
+          )}
+
           {/* Theme toggle */}
           <HeaderButton onClick={toggleTheme} title="Toggle theme">
             {isDark ? '\u2600' : '\u263E'}
@@ -524,6 +549,13 @@ function AppInner() {
           onStart={ngrok.startTunnel}
           onStop={ngrok.stopTunnel}
           onRecheck={ngrok.recheckInstallation}
+        />
+      )}
+
+      {showUpdateModal && updateStatus && (
+        <UpdateModal
+          status={updateStatus}
+          onClose={() => setShowUpdateModal(false)}
         />
       )}
 

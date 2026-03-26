@@ -2,6 +2,7 @@ import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@remote-orchestrator/shared';
 import type { SessionManager } from '../services/SessionManager.js';
 import type { AuthService } from '../services/AuthService.js';
+import type { UpdateService } from '../services/UpdateService.js';
 
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
@@ -26,6 +27,7 @@ export function setupSocketHandler(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
   manager: SessionManager,
   authService: AuthService,
+  updateService: UpdateService,
 ): void {
   io.use((socket, next) => {
     if (!authService.enabled) {
@@ -42,6 +44,8 @@ export function setupSocketHandler(
 
   io.on('connection', (socket: TypedSocket) => {
     console.log(`Client connected: ${socket.id}`);
+    // Re-emit cached update status so late-joining clients see the button
+    updateService.broadcastToSocket(socket);
 
     socket.on('session:join', (sessionId: string) => {
       socket.join(sessionId);

@@ -1,4 +1,4 @@
-import type { SessionInfo, CreateSessionRequest, PathCompletionResponse, DirectoryChildrenResponse, FileContentResponse, FileSearchResponse, GitDiffResponse, NgrokStatus, NgrokStartResponse, AppConfig, AgentDetectionResponse, AuthStatus, AuthLoginResponse } from '@remote-orchestrator/shared';
+import type { SessionInfo, CreateSessionRequest, PathCompletionResponse, DirectoryChildrenResponse, FileContentResponse, FileSearchResponse, GitDiffResponse, NgrokStatus, NgrokStartResponse, AppConfig, AgentDetectionResponse, AuthStatus, AuthLoginResponse, UpdateStatus, UpdateApplyResponse } from '@remote-orchestrator/shared';
 
 const API_BASE = '/api';
 const TOKEN_KEY = 'orchestrator_auth_token';
@@ -185,6 +185,20 @@ export const api = {
     if (!res.ok) {
       const err = await res.json() as { error?: string };
       throw new Error(err.error || 'Login failed');
+    }
+    return res.json();
+  },
+
+  checkUpdate: async (): Promise<UpdateStatus> => {
+    const res = await authFetch(`${API_BASE}/update/check`);
+    return res.json();
+  },
+
+  applyUpdate: async (): Promise<UpdateApplyResponse> => {
+    const res = await authFetch(`${API_BASE}/update/apply`, { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error || 'Failed to apply update');
     }
     return res.json();
   },

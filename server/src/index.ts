@@ -16,7 +16,9 @@ import { createGitRoutes } from './routes/git.js';
 import { createNgrokRoutes } from './routes/ngrok.js';
 import { createAuthRoutes } from './routes/auth.js';
 import { NgrokService } from './services/NgrokService.js';
+import { UpdateService } from './services/UpdateService.js';
 import { createConfigRoutes, createAgentRoutes } from './routes/config.js';
+import { createUpdateRoutes } from './routes/update.js';
 import { setupSocketHandler } from './socket/handler.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 
@@ -57,6 +59,10 @@ ngrokService.setIo(io);
 ngrokService.getAuthRequired = () => authService.enabled;
 ngrokService.onDisconnect = () => authService.clearAuth();
 
+// Update service
+const updateService = new UpdateService();
+updateService.setIo(io);
+
 // Temporary screenshot-save endpoint (dev only)
 import fs from 'fs';
 const screenshotsDir = path.resolve(__dirname, '..', '..', 'docs', 'screenshots');
@@ -80,9 +86,10 @@ app.use('/api/ngrok', createNgrokRoutes(ngrokService, authService));
 app.use('/api/auth', createAuthRoutes(authService));
 app.use('/api/config', createConfigRoutes(configStore));
 app.use('/api/agents', createAgentRoutes(agentRegistry));
+app.use('/api/update', createUpdateRoutes(updateService));
 
 // Socket.io
-setupSocketHandler(io, sessionManager, authService);
+setupSocketHandler(io, sessionManager, authService, updateService);
 
 // Start
 const PORT = 5400;
@@ -101,6 +108,7 @@ httpServer.on('error', (err: NodeJS.ErrnoException) => {
 
 async function start() {
   await sessionManager.restoreSessions();
+  updateService.start();
   httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
@@ -109,6 +117,7 @@ async function start() {
 start().catch(console.error);
 
 const shutdown = async () => {
+  updateService.stop();
   await sessionManager.shutdown();
   await ngrokService.stop();
   process.exit(0);
