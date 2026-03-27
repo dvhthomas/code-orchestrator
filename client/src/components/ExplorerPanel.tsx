@@ -1,11 +1,73 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism-light';
+import tsxLang from 'react-syntax-highlighter/dist/esm/languages/prism/tsx';
+import typescriptLang from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
+import javascriptLang from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import jsxLang from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
+import jsonLang from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import cssLang from 'react-syntax-highlighter/dist/esm/languages/prism/css';
+import scssLang from 'react-syntax-highlighter/dist/esm/languages/prism/scss';
+import lessLang from 'react-syntax-highlighter/dist/esm/languages/prism/less';
+import markupLang from 'react-syntax-highlighter/dist/esm/languages/prism/markup';
+import bashLang from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import pythonLang from 'react-syntax-highlighter/dist/esm/languages/prism/python';
+import rubyLang from 'react-syntax-highlighter/dist/esm/languages/prism/ruby';
+import rustLang from 'react-syntax-highlighter/dist/esm/languages/prism/rust';
+import goLang from 'react-syntax-highlighter/dist/esm/languages/prism/go';
+import javaLang from 'react-syntax-highlighter/dist/esm/languages/prism/java';
+import cLang from 'react-syntax-highlighter/dist/esm/languages/prism/c';
+import cppLang from 'react-syntax-highlighter/dist/esm/languages/prism/cpp';
+import csharpLang from 'react-syntax-highlighter/dist/esm/languages/prism/csharp';
+import phpLang from 'react-syntax-highlighter/dist/esm/languages/prism/php';
+import swiftLang from 'react-syntax-highlighter/dist/esm/languages/prism/swift';
+import kotlinLang from 'react-syntax-highlighter/dist/esm/languages/prism/kotlin';
+import yamlLang from 'react-syntax-highlighter/dist/esm/languages/prism/yaml';
+import tomlLang from 'react-syntax-highlighter/dist/esm/languages/prism/toml';
+import markdownLang from 'react-syntax-highlighter/dist/esm/languages/prism/markdown';
+import sqlLang from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
+import graphqlLang from 'react-syntax-highlighter/dist/esm/languages/prism/graphql';
+import hclLang from 'react-syntax-highlighter/dist/esm/languages/prism/hcl';
+import dockerLang from 'react-syntax-highlighter/dist/esm/languages/prism/docker';
+import makefileLang from 'react-syntax-highlighter/dist/esm/languages/prism/makefile';
+import { syntaxTheme } from '../utils/syntaxTheme';
+import { langFromPath } from '../utils/langFromPath';
 import { FolderOpen, FileText, File, FileCode, FileJson, RefreshCw, Copy, Check, Search, Link, BookOpen, Code } from 'lucide-react';
 import type { SessionInfo, FileContentResponse, FileSearchResult } from '@remote-orchestrator/shared';
 import { ExplorerFolderTree } from './ExplorerFolderTree.js';
 import { SessionSidebar } from './SessionSidebar.js';
 import { Tooltip } from './primitives/Tooltip.js';
 import { api } from '../services/api.js';
+
+SyntaxHighlighter.registerLanguage('tsx', tsxLang);
+SyntaxHighlighter.registerLanguage('typescript', typescriptLang);
+SyntaxHighlighter.registerLanguage('javascript', javascriptLang);
+SyntaxHighlighter.registerLanguage('jsx', jsxLang);
+SyntaxHighlighter.registerLanguage('json', jsonLang);
+SyntaxHighlighter.registerLanguage('css', cssLang);
+SyntaxHighlighter.registerLanguage('scss', scssLang);
+SyntaxHighlighter.registerLanguage('less', lessLang);
+SyntaxHighlighter.registerLanguage('markup', markupLang);
+SyntaxHighlighter.registerLanguage('bash', bashLang);
+SyntaxHighlighter.registerLanguage('python', pythonLang);
+SyntaxHighlighter.registerLanguage('ruby', rubyLang);
+SyntaxHighlighter.registerLanguage('rust', rustLang);
+SyntaxHighlighter.registerLanguage('go', goLang);
+SyntaxHighlighter.registerLanguage('java', javaLang);
+SyntaxHighlighter.registerLanguage('c', cLang);
+SyntaxHighlighter.registerLanguage('cpp', cppLang);
+SyntaxHighlighter.registerLanguage('csharp', csharpLang);
+SyntaxHighlighter.registerLanguage('php', phpLang);
+SyntaxHighlighter.registerLanguage('swift', swiftLang);
+SyntaxHighlighter.registerLanguage('kotlin', kotlinLang);
+SyntaxHighlighter.registerLanguage('yaml', yamlLang);
+SyntaxHighlighter.registerLanguage('toml', tomlLang);
+SyntaxHighlighter.registerLanguage('markdown', markdownLang);
+SyntaxHighlighter.registerLanguage('sql', sqlLang);
+SyntaxHighlighter.registerLanguage('graphql', graphqlLang);
+SyntaxHighlighter.registerLanguage('hcl', hclLang);
+SyntaxHighlighter.registerLanguage('docker', dockerLang);
+SyntaxHighlighter.registerLanguage('makefile', makefileLang);
 
 const NARROW_BREAKPOINT = 520;
 
@@ -272,6 +334,18 @@ export function ExplorerPanel({ sessions, onSelectSession }: ExplorerPanelProps)
   const isSearchActive = searchQuery.trim().length > 0;
   const isMd = selectedFilePath?.toLowerCase().endsWith('.md') ?? false;
 
+  const language = useMemo(
+    () => selectedFilePath ? langFromPath(selectedFilePath) : undefined,
+    [selectedFilePath],
+  );
+  const lineCount = useMemo(
+    () => fileContent?.content.split('\n').length ?? 0,
+    [fileContent],
+  );
+  const tooManyLines = lineCount > 5000;
+  const tooLargeBytes = (fileContent?.size ?? 0) > 200_000;
+  const useHighlight = !!language && !tooManyLines && !tooLargeBytes;
+
   if (sessions.length === 0) {
     return (
       <div style={{
@@ -492,18 +566,61 @@ export function ExplorerPanel({ sessions, onSelectSession }: ExplorerPanelProps)
                     <ReactMarkdown>{fileContent.content}</ReactMarkdown>
                   </div>
                 ) : (
-                  <pre style={{
-                    margin: 0,
-                    padding: '16px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 'var(--text-sm)',
-                    lineHeight: 1.6,
-                    color: 'var(--color-text-primary)',
-                    whiteSpace: 'pre',
-                    overflowX: 'auto',
-                  }}>
-                    {fileContent.content}
-                  </pre>
+                  <>
+                    {!!language && (tooManyLines || tooLargeBytes) && (
+                      <div style={{
+                        padding: '6px 14px',
+                        fontSize: 'var(--text-xs)',
+                        background: 'rgba(224, 175, 104, 0.1)',
+                        color: 'var(--color-status-warning, #e0af68)',
+                        borderBottom: '1px solid var(--color-border-base)',
+                        flexShrink: 0,
+                      }}>
+                        File too large for syntax highlighting — showing plain text
+                      </div>
+                    )}
+                    {useHighlight ? (
+                      <SyntaxHighlighter
+                        language={language}
+                        style={syntaxTheme}
+                        showLineNumbers
+                        lineNumberStyle={{
+                          minWidth: '2.5em',
+                          paddingRight: '1em',
+                          color: 'var(--color-text-muted)',
+                          userSelect: 'none' as const,
+                          fontSize: 'var(--text-xs)',
+                        }}
+                        customStyle={{
+                          margin: 0,
+                          padding: '16px',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 'var(--text-sm)',
+                          lineHeight: 1.6,
+                          background: 'var(--color-bg-code)',
+                          borderRadius: 0,
+                          overflowX: 'auto',
+                          whiteSpace: 'pre',
+                        }}
+                        wrapLongLines={false}
+                      >
+                        {fileContent.content}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <pre style={{
+                        margin: 0,
+                        padding: '16px',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 'var(--text-sm)',
+                        lineHeight: 1.6,
+                        color: 'var(--color-text-primary)',
+                        whiteSpace: 'pre',
+                        overflowX: 'auto',
+                      }}>
+                        {fileContent.content}
+                      </pre>
+                    )}
+                  </>
                 )}
               </>
             )}
