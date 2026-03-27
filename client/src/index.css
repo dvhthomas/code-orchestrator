@@ -55,16 +55,12 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(128, 128, 128, 0.15);
+  background: rgba(128, 128, 128, 0.4);
   pointer-events: none;
   z-index: 2;
   border-radius: inherit;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.dashboard-grid:focus-within .terminal-panel::after {
   opacity: 1;
+  transition: opacity 0.2s ease;
 }
 
 .dashboard-grid:focus-within .terminal-panel:focus-within::after {
