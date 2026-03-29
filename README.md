@@ -1,4 +1,4 @@
-# Code Orchestrator `v0.2.3`
+# Code Orchestrator `v0.2.4`
 
 A web-based dashboard for managing multiple AI coding agent sessions simultaneously. Spawn [Claude Code](https://claude.ai/code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or [OpenAI Codex](https://github.com/openai/codex) processes via pseudo-terminals, stream their I/O to browser-based terminals, and monitor session state in real time.
 
@@ -111,52 +111,6 @@ Removes the `swarm` symlink. Optionally removes `node_modules/`. Project files a
 | Key | Action |
 |-----|--------|
 | `Escape` | Exit diff fullscreen → close diff panel → exit focus mode (priority order) |
-
-## Development
-
-```bash
-# Install all dependencies
-npm install
-
-# Run server + client concurrently (dev mode)
-npm run dev
-
-# Run workspaces individually
-npm run dev -w server    # Express + Socket.io on port 5400
-npm run dev -w client    # Vite dev server on port 5173
-
-# Build
-npm run build -w shared  # Build shared types first
-npm run build -w server
-npm run build -w client
-
-# Lint
-npm run lint -w client
-```
-
-| Service | Port | Notes |
-|---------|------|-------|
-| Server  | 5400 | Express + Socket.io |
-| Client  | 5173 | Vite dev server, proxies `/api` and `/socket.io` to server |
-
-## Architecture
-
-```
-remote-orchestrator/
-├── shared/          # TypeScript types shared between server and client
-├── server/          # Express + Socket.io + node-pty backend
-│   ├── services/    # SessionManager, PtyManager, StateDetector
-│   ├── persistence/ # JSON file stores (SessionStore, OrderStore)
-│   ├── socket/      # Socket.io connection handler
-│   └── routes/      # REST endpoints (sessions, filesystem)
-├── client/          # React + Vite + xterm.js frontend
-│   ├── components/  # Dashboard, TerminalPanel, CreateSessionModal, etc.
-│   ├── hooks/       # useSocket, useSessions, useSessionOrder, useTerminal
-│   └── services/    # REST API client
-├── bin/swarm.sh     # Launch script (installed as `swarm` command)
-├── setup.sh         # One-command installer
-└── uninstall.sh     # Cleanup script
-```
 
 ### How It Works
 
