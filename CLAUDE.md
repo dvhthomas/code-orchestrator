@@ -59,7 +59,7 @@ Client ←(REST)→ Server for CRUD. Client ←(Socket.io rooms)→ Server for r
 
 ## Versioning
 
-When bumping the version, update it in **both** `package.json` (root) and the version badge in `README.md` (line 1: `# Code Orchestrator \`vX.Y.Z\``).
+When bumping the version, update it in **both** `package.json` (root) and the version badge in `README.md` (the shield.io badge URL on line 3 contains the version string: `![Version](https://img.shields.io/badge/version-X.Y.Z-blue)`).
 
 ## Key Details
 

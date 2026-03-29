@@ -74,7 +74,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(128, 128, 128, 0.4);
+  background: rgba(128, 128, 128, 0.25);
   pointer-events: none;
   z-index: 2;
   border-radius: inherit;
