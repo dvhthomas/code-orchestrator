@@ -9,10 +9,16 @@ type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 export function useSessions(socket: TypedSocket) {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
 
-  // Load sessions on mount
+  // Load sessions on mount and after reconnect
   useEffect(() => {
     api.getSessions().then(setSessions).catch(console.error);
-  }, []);
+
+    const handleReconnect = () => {
+      api.getSessions().then(setSessions).catch(console.error);
+    };
+    socket.on('connect', handleReconnect);
+    return () => { socket.off('connect', handleReconnect); };
+  }, [socket]);
 
   // Listen for socket events
   useEffect(() => {

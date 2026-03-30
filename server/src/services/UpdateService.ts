@@ -111,12 +111,15 @@ export class UpdateService {
 
     try {
       // Guard: check for uncommitted local changes
-      if (!force) {
-        const { stdout: statusOut } = await execFile('git', ['status', '--porcelain'], { cwd: this.repoRoot() });
-        if (statusOut.trim()) {
+      const { stdout: statusOut } = await execFile('git', ['status', '--porcelain'], { cwd: this.repoRoot() });
+      if (statusOut.trim()) {
+        if (!force) {
           this.isApplying = false;
-          return { success: false, warning: 'You have local changes that will not be included in the update. The update will proceed with git pull, which may conflict with your changes.', requiresConfirmation: true };
+          return { success: false, warning: 'You have uncommitted local changes. They will be stashed automatically before updating. You can recover them later with `git stash pop`.', requiresConfirmation: true };
         }
+        console.log('[update] Stashing local changes before pull...');
+        await execFile('git', ['stash', '--include-untracked'], { cwd: this.repoRoot() });
+        console.log('[update] Local changes stashed.');
       }
 
       // Run git pull
