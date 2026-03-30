@@ -68,6 +68,7 @@ export function GitDiffPanel({
   const [collapseAllKey, setCollapseAllKey] = useState(0);
   const [collapsedSections, setCollapsedSections] = useState<Set<SectionKey>>(new Set());
   const [untrackedContent, setUntrackedContent] = useState<Map<string, string | 'loading' | 'error'>>(new Map());
+  const [trackingFile, setTrackingFile] = useState<string | null>(null);
 
   const commitModeResult = useCommitMode();
   const { commitMode, actions, selectedFileCount } = commitModeResult;
@@ -200,6 +201,9 @@ export function GitDiffPanel({
     filteredStaged.forEach((file) =>
       entries.push({ key: `staged:${file.to ?? file.from ?? ''}`, category: 'staged', file }),
     );
+    filteredBranch.forEach((file) =>
+      entries.push({ key: `branch:${file.to ?? file.from ?? ''}`, category: 'branch', file }),
+    );
     filteredUntracked.forEach((filePath) =>
       entries.push({ key: `untracked:${filePath}`, category: 'untracked', filePath }),
     );
@@ -235,12 +239,18 @@ export function GitDiffPanel({
   }, [selectedEntry, folderPath]);
 
   async function handleTrackFile(filePath: string) {
-    await fetch(`/api/sessions/${currentSessionId}/git-add`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filePath }),
-    });
-    onRefresh();
+    if (trackingFile) return;
+    setTrackingFile(filePath);
+    try {
+      await fetch(`/api/sessions/${currentSessionId}/git-add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath }),
+      });
+      onRefresh();
+    } finally {
+      setTrackingFile(null);
+    }
   }
 
   const headerBtnStyle = {
@@ -268,7 +278,7 @@ export function GitDiffPanel({
       const contentVal = untrackedContent.get(entry.filePath);
       const untrackedMeta: FileMeta = { filePath: entry.filePath, hunks: [], isUntracked: true };
       const untrackedIsSelected = commitModeActive
-        ? (commitMode.selections.get(entry.filePath)?.size ?? 0) > 0
+        ? commitMode.selections.has(entry.filePath)
         : false;
       return (
         <>
@@ -284,17 +294,12 @@ export function GitDiffPanel({
             }}
           >
             {commitModeActive && (
-              <span
-                onClick={(e) => { e.stopPropagation(); actions.toggleFile(entry.filePath, untrackedMeta); }}
-                style={{ display: 'inline-flex', alignItems: 'center' }}
-              >
-                <TriStateCheckbox
-                  checked={untrackedIsSelected}
-                  onChange={() => actions.toggleFile(entry.filePath, untrackedMeta)}
-                  size={11}
-                  label={`Toggle ${entry.filePath} selection`}
-                />
-              </span>
+              <TriStateCheckbox
+                checked={untrackedIsSelected}
+                onChange={() => actions.toggleFile(entry.filePath, untrackedMeta)}
+                size={11}
+                label={`Toggle ${entry.filePath} selection`}
+              />
             )}
             <span style={{ fontSize: '11px', fontWeight: 600, color: categoryColor.untracked, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>untracked</span>
             <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 700, flexShrink: 0 }}>??</span>
@@ -449,6 +454,16 @@ export function GitDiffPanel({
         value={searchQuery}
         onChange={e => setSearchQuery(e.target.value)}
         onClick={e => e.stopPropagation()}
+        onKeyDown={e => {
+          if (e.key === 'Escape') {
+            e.stopPropagation();
+            if (searchQuery) {
+              setSearchQuery('');
+            } else {
+              (e.target as HTMLInputElement).blur();
+            }
+          }
+        }}
         style={{
           flex: 1,
           boxSizing: 'border-box',
@@ -481,6 +496,7 @@ export function GitDiffPanel({
           background: 'none',
           cursor: 'pointer',
           padding: topPad ? '12px 4px 8px' : '4px 4px 8px',
+          minHeight: '36px',
           color: 'var(--color-text-secondary)',
           textAlign: 'left',
         }}
@@ -562,8 +578,8 @@ export function GitDiffPanel({
               {'\u2261'}
             </button>
           )}
-          {/* Commit mode toggle — only in Git Diff tab (showHeaderControls = false) */}
-          {!showHeaderControls && !isEmpty && !error && (
+          {/* Commit mode toggle — shown in all views */}
+          {!isEmpty && !error && (
             <button
               onClick={handleToggleCommitMode}
               style={{
@@ -669,6 +685,14 @@ export function GitDiffPanel({
                 ))}
               </div>
             )}
+            {!error && filteredBranch.length > 0 && (
+              <div>
+                {sectionHeader('branch', 'Branch Changes (vs HEAD)', filteredBranch.length, filteredUnstaged.length > 0 || filteredStaged.length > 0)}
+                {!collapsedSections.has('branch') && filteredBranch.map((file, i) => (
+                  <DiffFileSection key={`branch-${i}`} file={file} theme={theme} defaultExpanded={defaultExpanded} collapseAllKey={collapseAllKey} searchQuery={searchLower || undefined} />
+                ))}
+              </div>
+            )}
             {!error && filteredUntracked.length > 0 && (
               <div>
                 {sectionHeader('untracked', 'Untracked Files', filteredUntracked.length, filteredUnstaged.length > 0 || filteredStaged.length > 0 || filteredBranch.length > 0)}
@@ -676,9 +700,12 @@ export function GitDiffPanel({
                   <UntrackedFileRow
                     key={`untracked-${i}`}
                     filePath={filePath}
+                    folderPath={folderPath}
+                    theme={theme}
                     onTrack={() => handleTrackFile(filePath)}
+                    isTracking={trackingFile === filePath}
                     commitModeToggle={commitModeActive ? {
-                      isSelected: (commitMode.selections.get(filePath)?.size ?? 0) > 0,
+                      isSelected: commitMode.selections.has(filePath),
                       onToggle: () => actions.toggleFile(filePath, { filePath, hunks: [], isUntracked: true }),
                     } : undefined}
                   />
@@ -722,6 +749,16 @@ export function GitDiffPanel({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 onClick={e => e.stopPropagation()}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    if (searchQuery) {
+                      setSearchQuery('');
+                    } else {
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }
+                }}
                 style={{ flex: 1, boxSizing: 'border-box', fontSize: '12px', padding: '3px 8px', border: '1px solid var(--color-border-subtle)', borderRadius: '4px', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)', outline: 'none' }}
               />
               <button onClick={onRefresh} style={{ ...headerBtnStyle, opacity: isLoading ? 0.5 : 1, flexShrink: 0 }} title="Refresh diff">
@@ -779,13 +816,23 @@ export function GitDiffPanel({
                   })}
                 </div>
               )}
+              {filteredBranch.length > 0 && (
+                <div>
+                  <SidebarSectionHeader label="Branch" count={filteredBranch.length} isCollapsed={collapsedSections.has('branch')} onToggle={() => toggleSection('branch')} topPad={filteredUnstaged.length > 0 || filteredStaged.length > 0} />
+                  {!collapsedSections.has('branch') && filteredBranch.map((file) => {
+                    const key = `branch:${file.to ?? file.from ?? ''}`;
+                    const fileName = file.to === '/dev/null' ? file.from : file.to;
+                    return <FileRow key={key} fileName={fileName ?? 'unknown'} isNew={!!file.new} isDeleted={!!file.deleted} additions={file.additions} deletions={file.deletions} isActive={selectedKey === key} onClick={() => setUserSelectedKey(key)} />;
+                  })}
+                </div>
+              )}
               {filteredUntracked.length > 0 && (
                 <div>
                   <SidebarSectionHeader label="Untracked" count={filteredUntracked.length} isCollapsed={collapsedSections.has('untracked')} onToggle={() => toggleSection('untracked')} topPad={filteredUnstaged.length > 0 || filteredStaged.length > 0 || filteredBranch.length > 0} />
                   {!collapsedSections.has('untracked') && filteredUntracked.map((filePath) => {
                     const key = `untracked:${filePath}`;
                     const shortName = filePath.split('/').pop() ?? filePath;
-                    const isSelected = commitModeActive ? (commitMode.selections.get(filePath)?.size ?? 0) > 0 : false;
+                    const isSelected = commitModeActive ? commitMode.selections.has(filePath) : false;
                     return (
                       <button
                         key={key}
@@ -810,29 +857,25 @@ export function GitDiffPanel({
                         onMouseLeave={(e) => { if (selectedKey !== key) e.currentTarget.style.background = 'transparent'; }}
                       >
                         {commitModeActive && (
-                          <span
-                            onClick={(e) => { e.stopPropagation(); actions.toggleFile(filePath, { filePath, hunks: [], isUntracked: true }); }}
-                            style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
-                          >
-                            <TriStateCheckbox
-                              checked={isSelected}
-                              onChange={() => actions.toggleFile(filePath, { filePath, hunks: [], isUntracked: true })}
-                              size={11}
-                              label={`Toggle ${filePath}`}
-                            />
-                          </span>
+                          <TriStateCheckbox
+                            checked={isSelected}
+                            onChange={() => actions.toggleFile(filePath, { filePath, hunks: [], isUntracked: true })}
+                            size={11}
+                            label={`Toggle ${filePath}`}
+                          />
                         )}
                         <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 700, flexShrink: 0 }}>??</span>
                         <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: selectedKey === key ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
                           {shortName}
                         </span>
                         <button
-                          title="Track file (git add)"
+                          title={trackingFile === filePath ? 'Adding…' : 'Track file (git add)'}
                           onClick={(e) => { e.stopPropagation(); handleTrackFile(filePath); }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-success)'; }}
+                          disabled={!!trackingFile}
+                          style={{ background: 'none', border: 'none', cursor: trackingFile === filePath ? 'not-allowed' : 'pointer', color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: 1, padding: '0 2px', flexShrink: 0, opacity: trackingFile === filePath ? 0.4 : 1 }}
+                          onMouseEnter={(e) => { if (!trackingFile) e.currentTarget.style.color = 'var(--color-success)'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-                        >+</button>
+                        >{trackingFile === filePath ? '…' : '+'}</button>
                       </button>
                     );
                   })}
@@ -919,47 +962,92 @@ export function GitDiffPanel({
 
 interface UntrackedFileRowProps {
   filePath: string;
+  folderPath: string;
+  theme: 'dark' | 'light';
   onTrack: () => void;
+  isTracking?: boolean;
   commitModeToggle?: { isSelected: boolean; onToggle: () => void };
 }
 
-function UntrackedFileRow({ filePath, onTrack, commitModeToggle }: UntrackedFileRowProps) {
+function UntrackedFileRow({ filePath, folderPath, theme, onTrack, isTracking, commitModeToggle }: UntrackedFileRowProps) {
   const shortName = filePath.split('/').pop() ?? filePath;
+  const [expanded, setExpanded] = useState(false);
+  // null = not fetched yet, 'error' = failed/binary, string = content
+  const [content, setContent] = useState<string | 'error' | null>(null);
+
+  useEffect(() => {
+    if (!expanded || content !== null || !folderPath) return;
+    let cancelled = false;
+    const absPath = `${folderPath.replace(/\/$/, '')}/${filePath}`;
+    fetch(`/api/fs/file?path=${encodeURIComponent(absPath)}`)
+      .then(res => res.json())
+      .then((data: { content?: string; error?: string }) => {
+        if (!cancelled) setContent(data.content ?? 'error');
+      })
+      .catch(() => { if (!cancelled) setContent('error'); });
+    return () => { cancelled = true; };
+  }, [expanded, content, folderPath, filePath]);
+
   return (
-    <div
-      title={filePath}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '3px 12px 3px 12px',
-        fontSize: '12px',
-        fontFamily: 'var(--font-mono)',
-        color: 'var(--color-text-secondary)',
-      }}
-    >
-      {commitModeToggle && (
-        <span
-          onClick={(e) => { e.stopPropagation(); commitModeToggle.onToggle(); }}
-          style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
-        >
+    <div style={{ borderRadius: '6px', border: '1px solid var(--color-border-base)', overflow: 'hidden', marginBottom: '4px' }}>
+      <div
+        title={filePath}
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '3px 12px 3px 8px',
+          fontSize: '12px',
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--color-text-secondary)',
+          cursor: 'pointer',
+          background: 'var(--color-bg-elevated)',
+          userSelect: 'none',
+        }}
+      >
+        {commitModeToggle && (
           <TriStateCheckbox
             checked={commitModeToggle.isSelected}
             onChange={commitModeToggle.onToggle}
             size={11}
             label={`Toggle ${filePath}`}
           />
-        </span>
+        )}
+        <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', flexShrink: 0 }}>{expanded ? '▾' : '▸'}</span>
+        <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 700, flexShrink: 0 }}>??</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{shortName}</span>
+        <button
+          title={isTracking ? 'Adding…' : 'Track file (git add)'}
+          onClick={e => { e.stopPropagation(); onTrack(); }}
+          disabled={isTracking}
+          style={{ background: 'none', border: 'none', cursor: isTracking ? 'not-allowed' : 'pointer', color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: 1, padding: '0 2px', flexShrink: 0, opacity: isTracking ? 0.4 : 1 }}
+          onMouseEnter={(e) => { if (!isTracking) e.currentTarget.style.color = 'var(--color-success)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+        >{isTracking ? '…' : '+'}</button>
+      </div>
+      {expanded && (
+        <div style={{ overflow: 'auto', maxHeight: '300px' }}>
+          {content === null ? (
+            <div style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Loading…</div>
+          ) : content === 'error' ? (
+            <div style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Binary or unreadable file</div>
+          ) : content === '' ? (
+            <div style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>(empty file)</div>
+          ) : (
+            <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
+              <tbody>
+                {content.split('\n').map((line, i) => (
+                  <tr key={i} style={{ background: theme === 'dark' ? 'rgba(165,213,112,0.10)' : 'rgba(165,213,112,0.12)' }}>
+                    <td style={{ width: '40px', minWidth: '40px', padding: '0 4px', textAlign: 'right', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', userSelect: 'none', lineHeight: '20px' }}>{i + 1}</td>
+                    <td style={{ padding: '0 8px', fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)', whiteSpace: 'pre', lineHeight: '20px', overflow: 'hidden' }}>{line}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
-      <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 700, flexShrink: 0 }}>??</span>
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{shortName}</span>
-      <button
-        title="Track file (git add)"
-        onClick={onTrack}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-success)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-      >+</button>
     </div>
   );
 }
@@ -1030,19 +1118,16 @@ function FileRow({ fileName, isNew, isDeleted, additions, deletions, isActive, o
       }}
       onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--color-bg-elevated)'; }}
       onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+      onMouseDown={(e) => { e.currentTarget.style.background = 'var(--color-bg-active, rgba(99,102,241,0.12))'; }}
+      onMouseUp={(e) => { e.currentTarget.style.background = isActive ? 'var(--color-bg-elevated)' : 'var(--color-bg-elevated)'; }}
     >
       {checkboxState !== undefined && onToggleCheckbox && (
-        <span
-          onClick={(e) => { e.stopPropagation(); onToggleCheckbox(); }}
-          style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
-        >
-          <TriStateCheckbox
-            checked={checkboxState === 'all' ? true : checkboxState === 'partial' ? 'indeterminate' : false}
-            onChange={onToggleCheckbox}
-            size={11}
-            label={`Toggle ${fileName} selection`}
-          />
-        </span>
+        <TriStateCheckbox
+          checked={checkboxState === 'all' ? true : checkboxState === 'partial' ? 'indeterminate' : false}
+          onChange={onToggleCheckbox}
+          size={11}
+          label={`Toggle ${fileName} selection`}
+        />
       )}
       <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
         {shortName}

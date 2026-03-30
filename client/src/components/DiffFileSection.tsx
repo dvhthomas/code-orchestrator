@@ -74,23 +74,15 @@ export function DiffFileSection({ file, theme, defaultExpanded, collapseAllKey, 
       >
         {/* File-level checkbox in commit mode */}
         {commitMode && (
-          <span
-            onClick={e => {
-              e.stopPropagation();
-              commitMode.onToggleFile();
-            }}
-            style={{ display: 'inline-flex', alignItems: 'center', minWidth: 22, minHeight: 44 }}
-          >
-            <TriStateCheckbox
-              checked={
-                commitMode.fileTriState === 'all' ? true :
-                commitMode.fileTriState === 'partial' ? 'indeterminate' :
-                false
-              }
-              onChange={commitMode.onToggleFile}
-              label={`Toggle ${fileName} selection`}
-            />
-          </span>
+          <TriStateCheckbox
+            checked={
+              commitMode.fileTriState === 'all' ? true :
+              commitMode.fileTriState === 'partial' ? 'indeterminate' :
+              false
+            }
+            onChange={commitMode.onToggleFile}
+            label={`Toggle ${fileName} selection`}
+          />
         )}
         <span
           style={{

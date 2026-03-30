@@ -307,6 +307,7 @@ export function CommitBar({
                 background: 'transparent',
                 borderColor: 'var(--color-error)',
                 opacity: (isLoading || selectedFileCount === 0 || hasOnlyUntrackedSelected) ? 0.4 : 1,
+                cursor: (isLoading || selectedFileCount === 0 || hasOnlyUntrackedSelected) ? 'not-allowed' : 'pointer',
               }}
             >
               Discard
@@ -322,6 +323,7 @@ export function CommitBar({
                 background: canCommit && !isLoading ? 'var(--color-accent)' : 'var(--color-text-muted)',
                 borderColor: 'transparent',
                 opacity: (!canCommit || isLoading) ? 0.5 : 1,
+                cursor: (!canCommit || isLoading) ? 'not-allowed' : 'pointer',
               }}
             >
               <GitCommit size={12} strokeWidth={2} />
@@ -339,6 +341,7 @@ export function CommitBar({
                 background: canCommit && !isLoading ? 'var(--color-accent)' : 'var(--color-text-muted)',
                 borderColor: 'transparent',
                 opacity: (!canCommit || isLoading) ? 0.5 : 1,
+                cursor: (!canCommit || isLoading) ? 'not-allowed' : 'pointer',
               }}
             >
               <ArrowUpFromLine size={12} strokeWidth={2} />

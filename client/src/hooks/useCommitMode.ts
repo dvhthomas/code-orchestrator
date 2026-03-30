@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { api } from '../services/api.js';
 import type { PatchSelectionRequest } from '@remote-orchestrator/shared';
 
@@ -80,6 +80,8 @@ export interface UseCommitModeResult {
 
 export function fileTriState(fileSelection: FileSelection | undefined, fileMeta: FileMeta): TriState {
   if (!fileSelection || fileSelection.size === 0) return 'none';
+  // Untracked files use a sentinel Map([[0, Set([0])]]) — presence in map means selected
+  if (fileMeta.isUntracked) return 'all';
   let totalSelected = 0;
   let totalPossible = 0;
   for (const hunk of fileMeta.hunks) {
@@ -110,6 +112,10 @@ export function useCommitMode(): UseCommitModeResult {
     undoEntry: null,
     hasStaleDiff: false,
   });
+
+  // Always-current state ref to avoid stale closures in async operations
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; });
 
   // Track the diff fingerprint at commit mode entry to detect stale diffs
   const diffFingerprintRef = useRef<string>('');
@@ -198,6 +204,9 @@ export function useCommitMode(): UseCommitModeResult {
 
       if (currentState === 'all') {
         newSelections.delete(filePath);
+      } else if (fileMeta.isUntracked) {
+        // Sentinel: Map([[0, Set([0])]]) marks untracked file as "selected"
+        newSelections.set(filePath, new Map([[0, new Set([0])]]));
       } else {
         const fileSelection = new Map<number, Set<number>>();
         for (const hunk of fileMeta.hunks) {
@@ -216,7 +225,12 @@ export function useCommitMode(): UseCommitModeResult {
     setState(prev => {
       const newSelections = new Map<string, FileSelection>();
       for (const meta of fileMetas) {
-        if (meta.isUntracked || meta.isBinary || meta.isRenamed) continue;
+        if (meta.isBinary || meta.isRenamed) continue;
+        if (meta.isUntracked) {
+          // Sentinel for untracked files
+          newSelections.set(meta.filePath, new Map([[0, new Set([0])]]));
+          continue;
+        }
         const fileSelection = new Map<number, Set<number>>();
         for (const hunk of meta.hunks) {
           if (hunk.totalChanges === 0) continue;
@@ -307,7 +321,7 @@ export function useCommitMode(): UseCommitModeResult {
   ) => {
     setState(prev => ({ ...prev, status: 'staging', errorMessage: null }));
 
-    const { selections, commitMessage, isAmend } = state;
+    const { selections, commitMessage, isAmend } = stateRef.current;
 
     // Stage selected patches
     const patchSelections = buildSelections(fileMetas, selections);
@@ -362,7 +376,7 @@ export function useCommitMode(): UseCommitModeResult {
       undoEntry: null,
       hasStaleDiff: false,
     }));
-  }, [state]);
+  }, []);
 
   const stageCommitAndPush = useCallback(async (
     sessionId: string,
@@ -373,7 +387,7 @@ export function useCommitMode(): UseCommitModeResult {
   }, [stageAndCommit]);
 
   const discardSelected = useCallback(async (sessionId: string, fileMetas: FileMeta[]) => {
-    const { selections } = state;
+    const { selections } = stateRef.current;
     setState(prev => ({ ...prev, status: 'staging', errorMessage: null }));
 
     const patchSelections = buildSelections(fileMetas, selections);
@@ -482,7 +496,7 @@ export function useCommitMode(): UseCommitModeResult {
   }, []);
 
   const undoDiscard = useCallback(async (sessionId: string) => {
-    const { undoEntry } = state;
+    const { undoEntry } = stateRef.current;
     if (!undoEntry) return;
 
     const result = await api.undoDiscard(sessionId, undoEntry.id);
@@ -493,7 +507,7 @@ export function useCommitMode(): UseCommitModeResult {
 
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     setState(prev => ({ ...prev, undoEntry: null }));
-  }, [state]);
+  }, []);
 
   // Derived values
   let selectedLineCount = 0;

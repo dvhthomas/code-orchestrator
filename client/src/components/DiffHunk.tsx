@@ -126,17 +126,21 @@ export function DiffHunk({ chunk, theme, searchQuery, commitMode }: DiffHunkProp
               style={{
                 background: 'none',
                 border: 'none',
-                padding: 0,
+                padding: '4px',
+                minWidth: '28px',
+                minHeight: '28px',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 color: c.hunkText,
-                opacity: 0.4,
+                opacity: 0.55,
                 flexShrink: 0,
-                transition: 'opacity 0.15s',
+                transition: 'opacity 0.15s, background 0.15s',
+                borderRadius: '4px',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = 'rgba(128,128,128,0.15)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.55'; e.currentTarget.style.background = 'none'; }}
             >
               <Undo2 size={11} strokeWidth={2} />
             </button>
@@ -249,6 +253,8 @@ export function DiffHunk({ chunk, theme, searchQuery, commitMode }: DiffHunkProp
                   padding: '0 8px',
                   whiteSpace: 'pre',
                   overflow: 'hidden',
+                  cursor: showCommit && isChangeLine ? undefined : 'text',
+                  userSelect: showCommit ? undefined : 'text',
                 }}
               >
                 {searchQuery ? highlightText(change.content.slice(1), searchQuery) : change.content.slice(1)}

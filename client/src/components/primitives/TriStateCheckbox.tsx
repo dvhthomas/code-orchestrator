@@ -22,6 +22,7 @@ export function TriStateCheckbox({ checked, onChange, size = 13, disabled = fals
       type="checkbox"
       checked={checked === true}
       onChange={onChange}
+      onClick={e => e.stopPropagation()}
       disabled={disabled}
       aria-checked={checked === 'indeterminate' ? 'mixed' : checked}
       aria-label={label}
