@@ -1,6 +1,20 @@
 import type { SessionStatus } from '@remote-orchestrator/shared';
 
-const STRIP_ANSI = /\x1b\[[0-9;?>=]*[a-zA-Z~]|\x1b\].*?(\x07|\x1b\\)|\x1b[()#][A-Z0-9]|\x1b[\x20-\x2f]*[\x30-\x7e]|\r/g;
+// ECMA-48 compliant ANSI escape sequence stripper.
+// The old CSI class [0-9;?>=]* was missing ':' (0x3A) and '<' (0x3C), causing
+// modern sequences like \x1b[38:2:255:0:0m (colon-separated 24-bit color) to
+// fail stripping and leave artifacts ([38:2:255:0:0m) in the buffer.
+const STRIP_ANSI = new RegExp(
+  [
+    '\\x1b\\[[\\x30-\\x3f]*[\\x20-\\x2f]*[\\x40-\\x7e]', // CSI: full param range (0x30-0x3F incl. : and <)
+    '\\x1b\\][^\\x07\\x1b]*(?:\\x07|\\x1b\\\\)',           // OSC sequences
+    '\\x1b[P_^][^\\x1b]*\\x1b\\\\',                        // DCS, APC, PM string sequences
+    '\\x1b[()#][A-Z0-9]',                                   // Character set designations
+    '\\x1b[\\x20-\\x2f]*[\\x30-\\x7e]',                    // Other ESC sequences (Fp, Fe, Fs)
+    '\\r',                                                   // Carriage returns
+  ].join('|'),
+  'g'
+);
 
 const AGENT_PROMPT_PATTERNS: Record<string, RegExp[]> = {
   claude: [
@@ -81,7 +95,11 @@ export class StateDetector {
     // Use 1500 chars: frequent small status bar updates accumulate and push the
     // actual prompt text beyond a 500-char window within seconds.
     const tail = this.buffer.slice(-1500).trim();
-    if (this.promptPatterns.some(p => p.test(tail))) {
+    const matched = this.promptPatterns.some(p => p.test(tail));
+    if (process.env['DEBUG_STATE']) {
+      console.log(`[StateDetector] matched=${matched} tail(last200)=${JSON.stringify(tail.slice(-200))}`);
+    }
+    if (matched) {
       this.updateStatus('waiting');
     } else {
       this.updateStatus('running');
