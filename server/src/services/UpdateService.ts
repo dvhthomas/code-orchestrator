@@ -1,6 +1,6 @@
 import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
-import { readFileSync } from 'fs';
+import { readFileSync, utimesSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { gt as semverGt, clean as semverClean, valid as semverValid } from 'semver';
@@ -142,8 +142,11 @@ export class UpdateService {
           } catch (err) {
             console.error('[update] npm install failed:', (err as Error).message);
           }
-          // Exit with non-zero code so nodemon restarts (code 0 = "clean exit, wait for changes")
-          process.exit(1);
+          // Touch a watched file so nodemon detects a change and restarts the process.
+          // process.exit() does not work — nodemon waits for file changes on both clean and crash exits.
+          const indexFile = path.join(__dirname, '..', 'index.ts');
+          const now = new Date();
+          utimesSync(indexFile, now, now);
         })();
       }, 500);
 
