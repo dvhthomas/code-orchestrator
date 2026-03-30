@@ -5,8 +5,9 @@ import type { UpdateService } from '../services/UpdateService.js';
 export function createUpdateRoutes(updateService: UpdateService): Router {
   const router = Router();
 
-  // Returns cached update status — fast, no live API call
-  router.get('/check', (_req: Request, res: Response) => {
+  // Triggers a remote version check (subject to 60s cooldown), then returns status
+  router.get('/check', async (_req: Request, res: Response) => {
+    await updateService.checkForUpdate();
     res.json(updateService.getStatus());
   });
 
